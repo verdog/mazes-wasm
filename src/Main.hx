@@ -1,7 +1,7 @@
 class Main {
 	static function main() {
 		var g = new Grid(6, 20);
-		BinaryTreeMaze.on(g);
+		SidewinderMaze.on(g);
 		g.print();
 	}
 }
