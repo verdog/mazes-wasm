@@ -13,8 +13,8 @@ class Grid {
     }
 
     public function at(row:Int, column:Int) {
-        if (row < 0 || row > rows) return null;
-        if (column < 0 || column > columns) return null;
+        if (row < 0 || row >= rows) return null;
+        if (column < 0 || column >= columns) return null;
 
         return grid[row][column];
     }
@@ -62,6 +62,40 @@ class Grid {
             cell.west  = at(row    , col - 1);
         }
     }
+
+    public function string() {
+        var output = "+" + [for (_ in 0...columns) "---+"].join("") + "\n";
+
+        for (row in new GridRowIterator(this)) {
+            var top = "|";
+            var bottom = "+";
+
+            for (cell in row) {
+                if (cell == null) cell = new Cell(-1, -1);
+
+                var body = "   ";
+                var east_bound = if (cell.isLinked(cell.east)) " " else "|";
+
+                top += body;
+                top += east_bound;
+
+                var south_bound = if (cell.isLinked(cell.south)) "   " else "---";
+                var corner = "+";
+
+                bottom += south_bound;
+                bottom += corner;
+            }
+
+            output += top + "\n";
+            output += bottom + "\n";
+        }
+
+        return output;
+    }
+
+    public function print() {
+        Sys.print(string());
+    }
 }
 
 class GridIterator {
@@ -83,7 +117,7 @@ class GridIterator {
         var thisRow = row;
         var thisCol = column++;
 
-        if (column > grid.columns) {
+        if (column >= grid.columns) {
             row++;
             column = 0;
         }

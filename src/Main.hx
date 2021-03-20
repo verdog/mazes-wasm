@@ -1,7 +1,7 @@
 class Main {
 	static function main() {
-		trace("Hello, world!");
-
-		var g = new Grid(5, 5);
+		var g = new Grid(6, 20);
+		BinaryTreeMaze.on(g);
+		g.print();
 	}
 }

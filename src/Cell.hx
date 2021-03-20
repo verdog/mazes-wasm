@@ -16,12 +16,12 @@ class Cell {
         _links = new Map<Cell, Bool>();
     }
 
-    public function link(cell:Cell, bidirectional:Bool = false) {
+    public function link(cell:Cell, bidirectional:Bool = true) {
         _links[cell] = true;
         if (bidirectional == true) cell.link(this, false);
     }
 
-    public function unlink(cell:Cell, bidirectional:Bool = false) {
+    public function unlink(cell:Cell, bidirectional:Bool = true) {
         _links.remove(cell);
         if (bidirectional == true) cell.unlink(this, false);
     }
@@ -39,7 +39,7 @@ class Cell {
         return r;
     }
 
-    public function isLinked(cell:Cell) {
+    public function isLinked(cell:Cell):Bool {
         return _links.exists(cell);
     }
 }
