@@ -1,3 +1,10 @@
+import bitmap.Draw.RectangleShape;
+import Grid.GridIterator;
+import format.png.Data.Color;
+import sys.io.File;
+import sys.io.FileOutput;
+import bitmap.*;
+
 class Grid {
     public var rows(default, null):Int;
     public var columns(default, null):Int;
@@ -67,6 +74,10 @@ class Grid {
         return " ";
     }
 
+    public function backgroundColorFor(cell:Cell) {
+        return null;
+    }
+
     public function string() {
         var output = "+" + [for (_ in 0...columns) "---+"].join("") + "\n";
 
@@ -99,6 +110,64 @@ class Grid {
 
     public function print() {
         Sys.print(string());
+    }
+
+    private function rect(x1, y1, x2, y2, color, lineThickness:Int) {
+        return {
+            x: x1 - Math.floor(lineThickness/2),
+            y: y1 - Math.floor(lineThickness/2),
+            width: Useful.intAbs(x2 - x1) + Math.ceil(lineThickness/2),
+            height: Useful.intAbs(y2 - y1) + Math.ceil(lineThickness/2),
+            c: color,
+            blend: null,
+            fill: true
+        }
+    }
+    
+    public function png() {
+        var file = File.write("output.png");
+        var margin = 16;
+        var cellSize = 32;
+        var lineThickness = 4;
+    
+        var backgroundColor = new bitmap.Color(0xffffffff);
+        var wallColor = new bitmap.Color(0x222222ff);
+    
+        var PNG = new PNGBitmap(
+            2*margin + cellSize*columns, 
+            2*margin + cellSize*rows);
+        
+        // background
+        PNG.fill(backgroundColor);
+    
+        // cells
+        for (mode in ["backgrounds", "walls"]) {
+            for (cell in new GridIterator(this)) {
+                var x1 = cell.column * cellSize + margin;
+                var x2 = (cell.column + 1) * cellSize + margin;
+                var y1 = cell.row * cellSize + margin;
+                var y2 = (cell.row + 1) * cellSize + margin;
+                
+                if (mode == "backgrounds") {
+                    var color = backgroundColorFor(cell);
+                    if (color != null) {
+                        PNG.draw.rectangle(rect(x1, y1, x2, y2, color, lineThickness));
+                    }
+                } else {
+                    // mode == walls
+                    // top wall
+                    if (cell.north == null) PNG.draw.rectangle(rect(x1, y1, x2, y1, wallColor, lineThickness));
+                    if (cell.west == null) PNG.draw.rectangle(rect(x1, y1, x1, y2, wallColor, lineThickness));
+                    
+                    // bottom walls
+                    if (!cell.isLinked(cell.east)) PNG.draw.rectangle(rect(x2, y1, x2, y2, wallColor, lineThickness));
+                    if (!cell.isLinked(cell.south)) PNG.draw.rectangle(rect(x1, y2, x2, y2, wallColor, lineThickness));
+                }
+            }
+        }
+    
+        PNG.save(file);
+        file.close();
     }
 }
 

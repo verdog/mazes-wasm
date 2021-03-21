@@ -38,4 +38,18 @@ class Distances {
 
         return breadcrumbs;
     }
+
+    public function max() {
+        var max_distance = 0;
+        var max_cell = root;
+
+        for (cell => distance in cells) {
+            if (distance > max_distance) {
+                max_cell = cell;
+                max_distance = distance;
+            }
+        }
+
+        return {cell: max_cell, distance: max_distance};
+    }
 }

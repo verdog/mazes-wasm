@@ -7,7 +7,7 @@ class DistanceGrid extends Grid {
         if (distances != null && distances.getDistance(cell) != null) {
             return '${chars.charAt(distances.getDistance(cell))}';
         } else {
-            return " ";
+            return super.contentsOf(cell);
         }
     }
 }
