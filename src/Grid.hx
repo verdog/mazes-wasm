@@ -78,6 +78,10 @@ class Grid {
         return null;
     }
 
+    public function wallColorFor(cell:Cell):Null<bitmap.Color> {
+        return 0x222222ff;
+    }
+
     public function string() {
         var output = "+" + [for (_ in 0...columns) "---+"].join("") + "\n";
 
@@ -125,13 +129,15 @@ class Grid {
     }
     
     public function png() {
-        var file = File.write("output.png");
+        var filename = "output.png";
+        trace('Creating ${filename}...');
+
+        var file = File.write(filename);
         var margin = 16;
-        var cellSize = 32;
+        var cellSize = 4;
         var lineThickness = 4;
     
         var backgroundColor = new bitmap.Color(0xffffffff);
-        var wallColor = new bitmap.Color(0x222222ff);
     
         var PNG = new PNGBitmap(
             2*margin + cellSize*columns, 
@@ -155,13 +161,16 @@ class Grid {
                     }
                 } else {
                     // mode == walls
-                    // top wall
-                    if (cell.north == null) PNG.draw.rectangle(rect(x1, y1, x2, y1, wallColor, lineThickness));
-                    if (cell.west == null) PNG.draw.rectangle(rect(x1, y1, x1, y2, wallColor, lineThickness));
-                    
-                    // bottom walls
-                    if (!cell.isLinked(cell.east)) PNG.draw.rectangle(rect(x2, y1, x2, y2, wallColor, lineThickness));
-                    if (!cell.isLinked(cell.south)) PNG.draw.rectangle(rect(x1, y2, x2, y2, wallColor, lineThickness));
+                    var color = wallColorFor(cell);
+                    if (color != null) {
+                        // top wall
+                        if (cell.north == null) PNG.draw.rectangle(rect(x1, y1, x2, y1, color, lineThickness));
+                        if (cell.west == null) PNG.draw.rectangle(rect(x1, y1, x1, y2, color, lineThickness));
+                        
+                        // bottom walls
+                        if (!cell.isLinked(cell.east)) PNG.draw.rectangle(rect(x2, y1, x2, y2, color, lineThickness));
+                        if (!cell.isLinked(cell.south)) PNG.draw.rectangle(rect(x1, y2, x2, y2, color, lineThickness));
+                    }
                 }
             }
         }

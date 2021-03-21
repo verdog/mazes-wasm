@@ -44,6 +44,8 @@ class Cell {
     }
 
     public function distances() {
+        trace("Calculating distances...");
+        
         var distances = new Distances(this);
         var frontier = [this];
 

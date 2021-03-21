@@ -5,6 +5,18 @@
 			"name": "Haxe Interpreter",
 			"type": "haxe-eval",
 			"request": "launch"
+		},
+		{
+			"name": "HxCPP",
+			"type": "hxcpp",
+			"request": "launch",
+			"program": "${workspaceFolder}/bin/cpp/Main-debug"
+		},
+		{
+			"name": "hl",
+			"type": "hl",
+			"cwd": "${workspaceFolder}",
+			"request": "launch"
 		}
 	]
 }

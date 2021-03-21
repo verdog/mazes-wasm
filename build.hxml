@@ -2,6 +2,10 @@
 -D analyzer-optimize
 -main Main
 -lib bitmap
+
+# -lib hxcpp-debug-server
+# --debug
 # --interp
 # --python bin/main.py
---hl bin/main.hl
+# --hl bin/main.hl
+--cpp bin/cpp
