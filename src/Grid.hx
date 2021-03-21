@@ -74,7 +74,7 @@ class Grid {
         return " ";
     }
 
-    public function backgroundColorFor(cell:Cell) {
+    public function backgroundColorFor(cell:Cell):Null<bitmap.Color> {
         return null;
     }
 

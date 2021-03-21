@@ -2,4 +2,6 @@
 -D analyzer-optimize
 -main Main
 -lib bitmap
---interp
+# --interp
+# --python bin/main.py
+--hl bin/main.hl

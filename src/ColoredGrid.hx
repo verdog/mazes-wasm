@@ -9,7 +9,7 @@ class ColoredGrid extends Grid {
         max = distances.max().distance;
     }
 
-    override function backgroundColorFor(cell:Cell) {
+    override function backgroundColorFor(cell:Cell):Null<bitmap.Color> {
         var distance = distances.getDistance(cell);
         if (distance == null) {
             return null;

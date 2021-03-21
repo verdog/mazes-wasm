@@ -1,4 +1,4 @@
-function sampleArray(array:Array<Dynamic>) {
+function sampleArray(array) {
     var idx = Std.random(array.length);
     return array[idx];
 }
