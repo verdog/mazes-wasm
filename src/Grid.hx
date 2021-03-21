@@ -63,6 +63,10 @@ class Grid {
         }
     }
 
+    public function contentsOf(cell:Cell) {
+        return " ";
+    }
+
     public function string() {
         var output = "+" + [for (_ in 0...columns) "---+"].join("") + "\n";
 
@@ -73,7 +77,7 @@ class Grid {
             for (cell in row) {
                 if (cell == null) cell = new Cell(-1, -1);
 
-                var body = "   ";
+                var body = ' ${contentsOf(cell)} ';
                 var east_bound = if (cell.isLinked(cell.east)) " " else "|";
 
                 top += body;

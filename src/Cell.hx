@@ -42,4 +42,25 @@ class Cell {
     public function isLinked(cell:Cell):Bool {
         return _links.exists(cell);
     }
+
+    public function distances() {
+        var distances = new Distances(this);
+        var frontier = [this];
+
+        while (frontier.length > 0) {
+            var new_frontier = [];
+
+            for (cell in frontier) {
+                for (linked in cell.links()) {
+                    if (distances.getDistance(linked) != null) continue;
+                    distances.setDistance(linked, distances.getDistance(cell) + 1);
+                    new_frontier.push(linked);
+                }
+            }
+
+            frontier = new_frontier;
+        }
+
+        return distances;
+    }
 }
