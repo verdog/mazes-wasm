@@ -1,7 +1,11 @@
 import Useful.sampleArray;
 import Grid.GridIterator;
 
-class WilsonMaze {
+class WilsonMaze extends Maze {
+    public static function name() {
+        return "wilson";
+    }
+    
     public static function on(grid:Grid) {
         var unvisited = [];
         for (cell in new GridIterator(grid)) {
@@ -10,11 +14,6 @@ class WilsonMaze {
 
         var first = sampleArray(unvisited);
         unvisited.remove(first);
-
-        var step = Std.int(unvisited.length/64);
-        if (step == 0) step = 1;
-        var thresh = unvisited.length - step;
-        Sys.print("-");
 
         while (unvisited.length > 0) {
             var cell = sampleArray(unvisited);
@@ -34,14 +33,7 @@ class WilsonMaze {
             for (index in 0...path.length - 1) {
                 path[index].link(path[index + 1]);
                 unvisited.remove(path[index]);
-
-                if (unvisited.length < thresh) {
-                    thresh = if (thresh - step < 1) 1 else thresh - step;
-                    Sys.print("-");
-                }
             }
         }
-
-        Sys.print("\n");
     }
 }

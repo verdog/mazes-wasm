@@ -1,7 +1,11 @@
 import Useful.sampleArray;
 import Grid.GridRowIterator;
 
-class SidewinderMaze {
+class SidewinderMaze extends Maze {
+    public static function name() {
+        return "sidewinder";
+    }
+    
     public static function on(grid:Grid) {
         for (row in new GridRowIterator(grid)) {
             var run = [];

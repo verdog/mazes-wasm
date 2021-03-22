@@ -4,9 +4,13 @@ import Useful.sampleArray;
 import Grid.GridIterator;
 // attempt to combine wilson and aldous-broder to use each when they are fastest
 
-class FastMaze {
+class FastMaze extends Maze {
+    public static function name() {
+        return "fast";
+    }
+    
     public static function on(grid:Grid) {
-        trace("Generating maze... (FastMaze)");
+        // trace("Generating maze... (FastMaze)");
         
         // start with aldous-broder
         var unvisited = new Map<Cell, Bool>();
@@ -21,11 +25,6 @@ class FastMaze {
         var numUnvisited = grid.size() - 1;
         var switchThreshold = Std.int(grid.size()/64);
 
-        var step = Std.int(numUnvisited/64);
-        if (step == 0) step = 1;
-        var thresh = numUnvisited - step;
-        Sys.print("-");
-
         var next_start = cell;
 
         while (numUnvisited > switchThreshold) {
@@ -35,11 +34,6 @@ class FastMaze {
                 cell.link(neighbor);
                 unvisited.remove(neighbor);
                 numUnvisited--;
-
-                if (numUnvisited < thresh) {
-                    thresh = if (thresh - step < 1) 1 else thresh - step;
-                    Sys.print("-");
-                }
             }
 
             cell = neighbor;
@@ -47,14 +41,7 @@ class FastMaze {
         }
 
         // finish with wilson
-        Sys.print("|");
         var cell = next_start;
-
-        var step = Std.int(numUnvisited/64);
-        if (step == 0) step = 1;
-        var thresh = numUnvisited - step;
-        Sys.print("-");
-
 
         while (numUnvisited > 0) {
             var cell = sampleMap(unvisited);
@@ -75,14 +62,7 @@ class FastMaze {
                 path[index].link(path[index + 1]);
                 unvisited.remove(path[index]);
                 numUnvisited--;
-
-                if (numUnvisited < thresh) {
-                    thresh = if (thresh - step < 1) 1 else thresh - step;
-                    Sys.print("-");
-                }
             }
         }
-
-        Sys.print("\n");
     }
 }

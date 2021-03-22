@@ -30,6 +30,10 @@ class Cell {
         return _links.keys();
     }
 
+    public function getLinksList() {
+        return [for (l in links()) l];
+    }
+
     public function neighbors() {
         var r = [];
         if (north != null) r.push(north);

@@ -70,6 +70,16 @@ class Grid {
         }
     }
 
+    public function deadEnds() {
+        var list = [];
+
+        for (cell in this) {
+            if (cell.getLinksList().length == 1) list.push(cell);
+        }
+
+        return list;
+    }
+
     public function contentsOf(cell:Cell) {
         return " ";
     }
@@ -133,9 +143,9 @@ class Grid {
         trace('Creating ${filename}...');
 
         var file = File.write(filename);
-        var margin = 16;
-        var cellSize = 4;
-        var lineThickness = 4;
+        var margin = 64;
+        var cellSize = 16;
+        var lineThickness = 2;
     
         var backgroundColor = new bitmap.Color(0xffffffff);
     
@@ -146,9 +156,13 @@ class Grid {
         // background
         PNG.fill(backgroundColor);
     
+        var count = 0;
+        var step = rows*4;
+
         // cells
         for (mode in ["backgrounds", "walls"]) {
-            for (cell in new GridIterator(this)) {
+            trace('$mode...');
+            for (cell in this) {
                 var x1 = cell.column * cellSize + margin;
                 var x2 = (cell.column + 1) * cellSize + margin;
                 var y1 = cell.row * cellSize + margin;
@@ -172,11 +186,22 @@ class Grid {
                         if (!cell.isLinked(cell.south)) PNG.draw.rectangle(rect(x1, y2, x2, y2, color, lineThickness));
                     }
                 }
+
+                count++;
+                if (count > step) {
+                    Sys.print(".");
+                    count = 0;
+                }
             }
+            Sys.print("\n");
         }
     
         PNG.save(file);
         file.close();
+    }
+
+    public function iterator() {
+        return new GridIterator(this);
     }
 }
 

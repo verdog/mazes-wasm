@@ -25,6 +25,6 @@ class WalllessGrid extends Grid {
         var buffer = 32;
         var bright = buffer + Std.int((255 - buffer) * intensity);
         
-        return Color.create(dark, dark, bright, 255);
+        return Color.create(bright, dark, bright, 255);
     }
 }

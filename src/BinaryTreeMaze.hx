@@ -1,6 +1,10 @@
 import Grid.GridIterator;
 
-class BinaryTreeMaze {
+class BinaryTreeMaze extends Maze {
+    public static function name() {
+        return "btree";
+    }
+    
     public static function on(grid:Grid) {
         for (cell in new GridIterator(grid)) {
             var neighbors = [];
