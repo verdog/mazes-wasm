@@ -5,7 +5,8 @@ var MAZES:Array<Dynamic> = [
 	WilsonMaze,
 	FastMaze,
 	HuntAndKillMaze,
-	RecursiveBacktrackerMaze
+	RecursiveBacktrackerMaze,
+	RecursiveRecursiveBacktrackerMaze
 ];
 
 function countDeadEnds() {
