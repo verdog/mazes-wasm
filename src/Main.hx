@@ -1,22 +1,23 @@
+var MAZES:Array<Dynamic> = [
+	BinaryTreeMaze,
+	SidewinderMaze,
+	AldousBroderMaze,
+	WilsonMaze,
+	FastMaze,
+	HuntAndKillMaze,
+	RecursiveBacktrackerMaze
+];
+
 function countDeadEnds() {
 	var n = Std.parseInt(Sys.args()[0]);
 	var g = new ColoredGrid(n, n);
-
-	var mazes:Array<Dynamic> = [
-		BinaryTreeMaze,
-		SidewinderMaze,
-		AldousBroderMaze,
-		WilsonMaze,
-		FastMaze,
-		HuntAndKillMaze
-	];
 
 	var tries = 100;
 	var size = 20;
 
 	var averages = new Map<String, Float>();
 
-	for (maze in mazes) {
+	for (maze in MAZES) {
 		// trace('Running $maze...');
 
 		var dead_end_counts = [];
@@ -50,25 +51,27 @@ function countDeadEnds() {
 class Main {
 	
 	static function main() {
-		countDeadEnds();
-		// var n = Std.parseInt(Sys.args()[0]);
-		// var g = new ColoredGrid(n, n);
+		// countDeadEnds();
+		// return;
 
-		// // var g = new WalllessGrid(n, n);
-		// // SidewinderMaze.on(g);
-		// // BinaryTreeMaze.on(g);
-		// // AldousBroderMaze.on(g);
-		// // PickyAldousBroderMaze.on(g);
-		// // WilsonMaze.on(g);
-		// // PickyWilsonMaze.on(g);
-		// // FastMaze.on(g);
-		// HuntAndKillMaze.on(g);
+		var n = Std.parseInt(Sys.args()[0]);
+		var chosen_maze_name = Sys.args()[1];
+		var chosen_maze = null;
+		var g = new ColoredGrid(n, n);
 
-		// var start = g.at(Std.int(g.rows/2), Std.int(g.columns/2));
+		for (maze in MAZES) {
+			if (maze.name() == chosen_maze_name) {
+				chosen_maze = maze;
+				break;
+			}
+		}
+
+		chosen_maze.on(g);
+
+		var start = g.at(Std.int(g.rows/2), Std.int(g.columns/2));
 		
-		// g.setDistances(start.distances());
+		g.setDistances(start.distances());
 
-		// // g.print();
-		// g.png();
+		g.png();
 	}
 }
