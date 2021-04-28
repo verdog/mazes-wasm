@@ -2,9 +2,7 @@ import Useful.sampleArray;
 import Grid.GridIterator;
 
 class WilsonMaze extends Maze {
-    public static function name() {
-        return "wilson";
-    }
+    public static var name(default, null) = "wilson";
     
     public static function on(grid:Grid) {
         var unvisited = [];

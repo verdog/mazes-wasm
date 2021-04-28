@@ -1,9 +1,7 @@
 import Useful.sampleArray;
 
 class RecursiveBacktrackerMaze extends Maze {
-    public static function name() {
-        return "recursivebacktracker";
-    }
+    public static var name(default, null) = "recursivebacktracker";
 
     public static function on(grid:Grid) {
         var stack = [];

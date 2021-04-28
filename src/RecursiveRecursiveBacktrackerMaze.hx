@@ -1,12 +1,14 @@
 import Useful.sampleArray;
 
 class RecursiveRecursiveBacktrackerMaze extends Maze {
-    public static function name() {
-        return "recursiverecursivebacktracker";
-    }
+    public static var name(default, null) = "recursiverecursivebacktracker";
 
-    public static function on(grid:Grid) {
-        f(grid.randomCell());
+    public static function on(grid:Grid, start_at:Cell = null) {
+        if (start_at == null) {
+            f(grid.randomCell());
+        } else {
+            f(start_at);
+        }
     }
 
     private static function f(cell:Cell) {

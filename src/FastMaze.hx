@@ -5,9 +5,7 @@ import Grid.GridIterator;
 // attempt to combine wilson and aldous-broder to use each when they are fastest
 
 class FastMaze extends Maze {
-    public static function name() {
-        return "fast";
-    }
+    public static var name(default, null) = "fast";
     
     public static function on(grid:Grid) {
         // trace("Generating maze... (FastMaze)");

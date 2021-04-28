@@ -49,30 +49,39 @@ function countDeadEnds() {
 	}
 }
 
+function temp() {
+	var m = Mask.fromPNG("inputs/mask.png");
+
+	var g = new MaskedGrid(m);
+
+	RecursiveRecursiveBacktrackerMaze.on(g);
+
+	// g.setDistances(g.randomCell().distances());
+	g.setDistances(g.at(120,25).distances());
+
+	g.png("outputs/masked.png");
+}
+
 class Main {
 	
 	static function main() {
 		// countDeadEnds();
 		// return;
 
+		return temp();
+
 		var n = Std.parseInt(Sys.args()[0]);
-		var chosen_maze_name = Sys.args()[1];
-		var chosen_maze = null;
-		var g = new ColoredGrid(n, n);
+
+		#if debug
+		n = 64;
+		#end
 
 		for (maze in MAZES) {
-			if (maze.name() == chosen_maze_name) {
-				chosen_maze = maze;
-				break;
-			}
+			var g = new ColoredGrid(n, n);
+			maze.on(g);
+			var start = g.at(Std.int(g.rows/2), Std.int(g.columns/2));
+			g.setDistances(start.distances());
+			g.png('outputs/${maze.name}_$n.png');
 		}
-
-		chosen_maze.on(g);
-
-		var start = g.at(Std.int(g.rows/2), Std.int(g.columns/2));
-		
-		g.setDistances(start.distances());
-
-		g.png();
 	}
 }

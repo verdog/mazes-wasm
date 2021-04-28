@@ -59,7 +59,7 @@ class Grid {
     }
 
     private function configureCells() {
-        for (cell in new GridIterator(this)) {
+        for (cell in this) {
             var row = cell.row;
             var col = cell.column;
 
@@ -138,8 +138,7 @@ class Grid {
         }
     }
     
-    public function png() {
-        var filename = "output.png";
+    public function png(filename) {
         trace('Creating ${filename}...');
 
         var file = File.write(filename);
@@ -206,9 +205,11 @@ class Grid {
 }
 
 class GridIterator {
-    var grid:Grid;
-    var row:Int;
-    var column:Int;
+    var grid(default, null):Grid;
+    var row(default, null):Int;
+    var column(default, null):Int;
+
+    private var _next:Cell = null;
 
     public function new(grid:Grid) {
         this.grid = grid;
@@ -217,19 +218,35 @@ class GridIterator {
     }
 
     public function hasNext() {
-        return row < grid.rows && column < grid.columns;
+        if (_next == null)
+            computeNext();
+
+        return _next != null;
     }
 
     public function next() {
-        var thisRow = row;
-        var thisCol = column++;
-
-        if (column >= grid.columns) {
-            row++;
-            column = 0;
+        if (_next == null) {
+            computeNext();
         }
 
-        return grid.at(thisRow, thisCol);
+        var ret = _next;
+        _next = null;
+
+        return ret;
+    }
+
+    public function computeNext() {
+        do {
+            var thisRow = row;
+            var thisCol = column++;
+    
+            if (column >= grid.columns) {
+                row++;
+                column = 0;
+            }
+
+            _next = grid.at(thisRow, thisCol);
+        } while (_next == null && row < grid.rows && column < grid.columns);
     }
 }
 

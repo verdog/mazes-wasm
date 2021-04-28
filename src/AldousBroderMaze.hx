@@ -1,10 +1,8 @@
 import Useful.sampleArray;
 
 class AldousBroderMaze extends Maze {
-    public static function name() {
-        return "aldousbroder";
-    }
-    
+    public static var name(default, null) = "aldousbroder";
+
     public static function on(grid:Grid) {
         var cell = grid.randomCell();
         var unvisited = grid.size() - 1;

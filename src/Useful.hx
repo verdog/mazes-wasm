@@ -1,5 +1,3 @@
-import haxe.ds.HashMap;
-
 @:generic
 function sampleArray<T>(array:Array<T>) {
     var idx = Std.random(array.length);

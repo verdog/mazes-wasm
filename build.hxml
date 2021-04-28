@@ -3,8 +3,8 @@
 -main Main
 -lib bitmap
 
-# -lib hxcpp-debug-server
-# --debug
+-lib hxcpp-debug-server
+--debug
 # --interp
 # --python bin/main.py
 # --hl bin/main.hl

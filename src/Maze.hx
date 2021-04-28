@@ -1,4 +1,4 @@
 class Maze {
-    public static function on(grid:Grid):Void {};
-    public static function name() { return "none"; }
+    public static var name(default, null) = "none";
+    public static function on(grid:Grid, start_at:Cell = null):Void {};
 }

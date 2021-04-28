@@ -1,9 +1,7 @@
 import Useful.sampleArray;
 
 class HuntAndKillMaze extends Maze {
-    public static function name() {
-        return "huntandkill";
-    }
+    public static var name(default, null) = "huntandkill";
     
     public static function on(grid:Grid) {
         var current = grid.randomCell();
