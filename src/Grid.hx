@@ -20,8 +20,8 @@ class Grid {
     }
 
     public function at(row:Int, column:Int) {
-        if (row < 0 || row >= rows) return null;
-        if (column < 0 || column >= columns) return null;
+        if (row < 0 || row >= grid.length) return null;
+        if (column < 0 || column >= grid[row].length) return null;
 
         return grid[row][column];
     }
@@ -138,12 +138,11 @@ class Grid {
         }
     }
     
-    public function png(filename) {
+    public function png(filename, cellSize = 16) {
         trace('Creating ${filename}...');
 
         var file = File.write(filename);
         var margin = 64;
-        var cellSize = 16;
         var lineThickness = 2;
     
         var backgroundColor = new bitmap.Color(0xffffffff);
@@ -236,17 +235,17 @@ class GridIterator {
     }
 
     public function computeNext() {
-        do {
+        while (_next == null && row < grid.rows && column < grid.row(row).length) {
             var thisRow = row;
             var thisCol = column++;
     
-            if (column >= grid.columns) {
+            if (column >= grid.row(thisRow).length) {
                 row++;
                 column = 0;
             }
 
             _next = grid.at(thisRow, thisCol);
-        } while (_next == null && row < grid.rows && column < grid.columns);
+        } 
     }
 }
 

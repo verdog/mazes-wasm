@@ -47,7 +47,7 @@ class Cell {
         return _links.exists(cell);
     }
 
-    public function distances() {
+    public function calculateDistances() {
         trace("Calculating distances...");
         
         var distances = new Distances(this);

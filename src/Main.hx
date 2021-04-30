@@ -50,16 +50,14 @@ function countDeadEnds() {
 }
 
 function temp() {
-	var m = Mask.fromPNG("inputs/mask.png");
-
-	var g = new MaskedGrid(m);
+	var g = new PolarGrid(24);
 
 	RecursiveRecursiveBacktrackerMaze.on(g);
 
-	// g.setDistances(g.randomCell().distances());
-	g.setDistances(g.at(120,25).distances());
+	// g.setDistances(g.randomCell().calculateDistances());
+	//g.setDistances(g.at(120,25).distances());
 
-	g.png("outputs/masked.png");
+	g.png("outputs/circle.png");
 }
 
 class Main {
@@ -80,7 +78,7 @@ class Main {
 			var g = new ColoredGrid(n, n);
 			maze.on(g);
 			var start = g.at(Std.int(g.rows/2), Std.int(g.columns/2));
-			g.setDistances(start.distances());
+			g.setDistances(start.calculateDistances());
 			g.png('outputs/${maze.name}_$n.png');
 		}
 	}
