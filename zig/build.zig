@@ -11,7 +11,7 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
-    const exe = b.addExecutable("zig", "src/main.zig");
+    const exe = b.addExecutable("mazes", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
@@ -25,7 +25,7 @@ pub fn build(b: *std.build.Builder) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const test_locations = [_][]const u8{ "src/main.zig", "src/cell.zig", "src/grid.zig" };
+    const test_locations = [_][]const u8{ "src/main.zig", "src/grid.zig" };
 
     const test_step = b.step("test", "Run unit tests");
     for (test_locations) |loc| {
