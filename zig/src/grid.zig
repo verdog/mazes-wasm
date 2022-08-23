@@ -134,7 +134,9 @@ pub const Grid = struct {
         pub fn next(self: *CellI) ?*Cell {
             if (self.i < self.parent.size()) {
                 defer self.i += 1;
-                return self.parent.at(self.i % self.parent.width, @divTrunc(self.i, self.parent.height));
+                var x = @intCast(Unit, self.i % self.parent.width);
+                var y = @intCast(Unit, @divTrunc(self.i, self.parent.width));
+                return self.parent.at(x, y);
             } else {
                 return null;
             }
@@ -186,7 +188,7 @@ pub const Grid = struct {
         self.cells_buf = try self.mem.alloc(Cell, self.width * self.height);
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(Unit, i % self.width);
-            var y = @intCast(Unit, @divTrunc(i, self.height));
+            var y = @intCast(Unit, @divTrunc(i, self.width));
             cell.* = Cell.init(self.mem, x, y);
         }
     }
@@ -194,12 +196,69 @@ pub const Grid = struct {
     fn configureCells(self: *Grid) void {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(Unit, i % self.width);
-            var y = @intCast(Unit, @divTrunc(i, self.height));
-            cell.*.north = self.at(x, y -| 1);
-            cell.*.south = self.at(x, y +| 1);
-            cell.*.east = self.at(x +| 1, y);
-            cell.*.west = self.at(x -| 1, y);
+            var y = @intCast(Unit, @divTrunc(i, self.width));
+            if (y > 0) cell.*.north = self.at(x, y -| 1);
+            if (y < self.height - 1) cell.*.south = self.at(x, y +| 1);
+            if (x < self.width - 1) cell.*.east = self.at(x +| 1, y);
+            if (x > 0) cell.*.west = self.at(x -| 1, y);
         }
+    }
+
+    fn writeAndAdvance(buf: *[]u8, i: *usize, word: []const u8) !void {
+        var inner_slice = buf.*[i.* .. i.* + word.len];
+        std.mem.copy(u8, inner_slice, word);
+        i.* += word.len;
+    }
+
+    // TODO change this to accept a buffer or and allocator instead of using its own
+    pub fn makeString(self: Grid) ![]u8 {
+        // the output will have a top row of +---+,
+        // followed by a grid that takes up 2 rows
+        // per grid row.
+
+        //                  +   ---+            \n
+        var row_len: Unit = 1 + 4 * self.width + 1;
+        //                    top row   rest of maze
+        var total_len: Unit = row_len + row_len * self.height * 2;
+        var ret = try self.mem.alloc(u8, total_len);
+
+        var i: usize = 0;
+        const w = writeAndAdvance;
+
+        // top row
+        try w(&ret, &i, "+");
+        {
+            var j: usize = 0;
+            while (j < self.width) : (j += 1) {
+                try w(&ret, &i, "---+");
+            }
+        }
+        try w(&ret, &i, "\n");
+
+        // rest
+        {
+            // for each row
+            var j: usize = 0;
+            while (j < self.height) : (j += 1) {
+                var row_slice = self.cells_buf[j * self.width .. j * self.width + self.width];
+
+                // row 1
+                try w(&ret, &i, "|");
+                for (row_slice) |cell| {
+                    try w(&ret, &i, if (cell.east != null and cell.isLinked(cell.east.?) == true) "    " else "   |");
+                }
+                try w(&ret, &i, "\n");
+
+                // row 2
+                try w(&ret, &i, "+");
+                for (row_slice) |cell| {
+                    try w(&ret, &i, if (cell.south != null and cell.isLinked(cell.south.?) == true) "   +" else "---+");
+                }
+                try w(&ret, &i, "\n");
+            }
+        }
+
+        return ret;
     }
 };
 
@@ -343,4 +402,28 @@ test "Grid.cells(...) iterates over each cell exactly once" {
             try seen.put(cell, {});
         }
     }
+}
+
+test "Grid.makeString() returns a perfect, closed grid before modification" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 5, 5);
+    defer g.deinit();
+
+    var s = try g.makeString();
+    defer alloc.free(s);
+    const m: []const u8 =
+        \\+---+---+---+---+---+
+        \\|   |   |   |   |   |
+        \\+---+---+---+---+---+
+        \\|   |   |   |   |   |
+        \\+---+---+---+---+---+
+        \\|   |   |   |   |   |
+        \\+---+---+---+---+---+
+        \\|   |   |   |   |   |
+        \\+---+---+---+---+---+
+        \\|   |   |   |   |   |
+        \\+---+---+---+---+---+
+        \\
+    ;
+    try expectEq(true, std.mem.eql(u8, s, m));
 }
