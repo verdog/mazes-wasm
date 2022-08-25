@@ -211,6 +211,7 @@ pub const Grid = struct {
     }
 
     // TODO change this to accept a buffer or and allocator instead of using its own
+    // TODO benchmark this
     pub fn makeString(self: Grid) ![]u8 {
         // the output will have a top row of +---+,
         // followed by a grid that takes up 2 rows
