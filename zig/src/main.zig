@@ -12,16 +12,17 @@ pub fn main() !void {
     defer g.deinit();
 
     var seed = std.time.milliTimestamp();
-    _ = seed;
-    try mazes.BinaryTree.on(&g, 777);
+    try mazes.Sidewinder.on(&g, seed);
 
-    var stringy = try g.makeString();
-    defer alloc.free(stringy);
+    var s = try g.makeString();
+    defer alloc.free(s);
 
-    std.debug.print("{s}", .{stringy});
+    std.debug.print("{s}", .{s});
 }
 
 test "Run all tests" {
     _ = @import("grid.zig");
     _ = @import("mazes.zig");
+    _ = @import("qanvas.zig");
+    _ = @import("qoi.zig");
 }
