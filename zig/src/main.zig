@@ -1,6 +1,7 @@
 const std = @import("std");
-const Grid = @import("grid.zig").Grid;
-const mazes = @import("mazes.zig");
+
+const qoi = @import("qoi.zig");
+const qan = @import("qanvas.zig");
 
 var heap = std.heap.GeneralPurposeAllocator(.{}){};
 var alloc = heap.allocator();
@@ -8,16 +9,15 @@ var alloc = heap.allocator();
 pub fn main() !void {
     defer _ = heap.detectLeaks();
 
-    var g = try Grid.init(alloc, 12, 12);
-    defer g.deinit();
+    const len = 32;
 
-    var seed = std.time.milliTimestamp();
-    try mazes.Sidewinder.on(&g, seed);
+    var qanv = try qan.Qanvas.init(alloc, len, len);
+    defer qanv.deinit();
 
-    var s = try g.makeString();
-    defer alloc.free(s);
+    var encoded = try qoi.encode(qanv.buf, alloc, len, len, qoi.Channels.rgb, qoi.Colorspace.alpha_linear);
+    defer alloc.free(encoded);
 
-    std.debug.print("{s}", .{s});
+    std.debug.print("{s}", .{encoded});
 }
 
 test "Run all tests" {
