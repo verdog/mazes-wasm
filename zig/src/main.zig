@@ -5,19 +5,28 @@ const qan = @import("qanvas.zig");
 
 var heap = std.heap.GeneralPurposeAllocator(.{}){};
 var alloc = heap.allocator();
+const stdout = std.io.getStdOut().writer();
 
 pub fn main() !void {
     defer _ = heap.detectLeaks();
 
-    const len = 32;
+    const width = 64;
+    const height = 64;
 
-    var qanv = try qan.Qanvas.init(alloc, len, len);
+    var qanv = try qan.Qanvas.init(alloc, width, height);
     defer qanv.deinit();
 
-    var encoded = try qoi.encode(qanv.buf, alloc, len, len, qoi.Channels.rgb, qoi.Colorspace.alpha_linear);
+    var prev = qanv.buf[0];
+
+    for (qanv.buf) |*qix| {
+        defer prev = qix.*;
+        qix.* = .{ .red = prev.red +% 2, .green = prev.green, .blue = prev.blue };
+    }
+
+    var encoded = try qoi.encode(qanv.buf, alloc, width, height, qoi.Channels.rgb, qoi.Colorspace.alpha_linear);
     defer alloc.free(encoded);
 
-    std.debug.print("{s}", .{encoded});
+    try stdout.print("{s}", .{encoded});
 }
 
 test "Run all tests" {

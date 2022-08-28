@@ -8,7 +8,7 @@ pub const EncodeError = error{
 };
 
 const InternalEncodeError = error{
-    QoiNoRoom,
+    QoiBadChunk,
 };
 
 pub const Channels = enum(u8) {
@@ -26,6 +26,10 @@ pub const Qixel = struct {
     green: u8 = 0,
     blue: u8 = 255,
     alpha: u8 = 255,
+
+    pub fn equal(this: @This(), other: @This()) bool {
+        return this.red == other.red and this.green == other.green and this.blue == other.blue and this.alpha == other.alpha;
+    }
 };
 
 pub const Chunks = struct {
@@ -65,6 +69,74 @@ pub const Chunks = struct {
         }
     };
 
+    pub const RGBA = packed struct {
+        magic: u8 = 0b11111111,
+        red: u8 = 0,
+        green: u8 = 0,
+        blue: u8 = 0,
+        alpha: u8 = 0,
+
+        pub fn init(qix: Qixel) @This() {
+            return @This(){ .red = qix.red, .green = qix.green, .blue = qix.blue, .alpha = qix.alpha };
+        }
+    };
+
+    pub const Index = packed struct {
+        index: u6,
+        magic: u2 = 0b00,
+
+        pub fn init(idx: u6) @This() {
+            return @This(){ .index = idx };
+        }
+    };
+
+    pub const Diff = packed struct {
+        db: u2,
+        dg: u2,
+        dr: u2,
+        magic: u2 = 0b01,
+
+        fn i2u(in: i2) u2 {
+            return switch (in) {
+                -2 => 0b00,
+                -1 => 0b01,
+                0 => 0b10,
+                1 => 0b11,
+            };
+        }
+
+        pub fn init(dr: i2, dg: i2, db: i2) @This() {
+            return @This(){
+                .dr = i2u(dr),
+                .dg = i2u(dg),
+                .db = i2u(db),
+            };
+        }
+    };
+
+    pub const Luma = packed struct {
+        db: u4,
+        dr: u4,
+        dg: u6,
+        magic: u2 = 0b10,
+
+        pub fn init(dr: i4, dg: i6, db: i4) @This() {
+            return .{ .dr = @intCast(u4, dr) + 8, .dg = @intCast(u6, dg) + 32, .db = @intCast(u4, db) + 8 };
+        }
+    };
+
+    pub const Run = packed struct {
+        run: u6,
+        magic: u2 = 0b11,
+
+        pub fn init(run: u6) @This() {
+            // runs are stored with a bias of -1
+            return .{
+                .run = run - 1,
+            };
+        }
+    };
+
     pub const Tailer = packed struct { magic: u64 = @bitCast(u64, @as([8]u8, .{ 0, 0, 0, 0, 0, 0, 0, 1 })) };
 };
 
@@ -93,6 +165,11 @@ fn writeCursor(buffer: *[]u8, alloc: std.mem.Allocator, i: *usize, data: anytype
     i.* += len;
 }
 
+fn hash(qix: Qixel) u6 {
+    // a pixel of all 255s will add up to 6630, so u16s can handle the math
+    return @truncate(u6, @as(u16, qix.red) * 3 + @as(u16, qix.green) * 5 + @as(u16, qix.blue) * 7 + @as(u16, qix.alpha) * 11);
+}
+
 pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32, channels: Channels, colorspace: Colorspace) ![]u8 {
     if (buffer.len == 0) {
         return EncodeError.QoiMalformedBuffer;
@@ -105,22 +182,84 @@ pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32
     var result = try alloc.alloc(u8, @divTrunc(width * height, 2));
     var i: usize = 0;
 
-    const Header = Chunks.Header;
-    const Tailer = Chunks.Tailer;
-    const RGB = Chunks.RGB;
+    {
+        const RGB = Chunks.RGB;
+        const RGBA = Chunks.RGBA;
+        const Run = Chunks.Run;
+        const Index = Chunks.Index;
+        const Diff = Chunks.Diff;
+        const Luma = Chunks.Luma;
 
-    try writeCursor(&result, alloc, &i, Header.init(width, height, channels, colorspace));
+        var prev = Qixel{ .red = 0, .green = 0, .blue = 0, .alpha = 255 };
+        var seen: [64]Qixel = .{.{ .red = 0, .green = 0, .blue = 0, .alpha = 0 }} ** 64;
+        var current_run: u6 = 0;
 
-    // TODO: make this not super bad
-    for (buffer) |qix| {
-        if (channels == .rgb) {
-            try writeCursor(&result, alloc, &i, RGB.init(qix));
-        } else {
-            // rgba
+        try writeCursor(&result, alloc, &i, Chunks.Header.init(width, height, channels, colorspace));
+
+        for (buffer) |qix, j| {
+            // priority:
+            // 1. run
+            // 2. index
+            // 3. diff
+            // 4. luma
+            // 5. RGB
+            // 6. RGBA
+
+            defer prev = qix;
+            defer seen[hash(qix)] = qix;
+
+            // end run?
+            if (prev.equal(qix)) {
+                current_run += 1;
+                if (current_run == 62 or j == buffer.len - 1) {
+                    // close run; hit limit
+                    try writeCursor(&result, alloc, &i, Run.init(current_run));
+                    current_run = 0;
+                }
+            } else {
+                if (current_run > 0) {
+                    // close run; not a match
+                    try writeCursor(&result, alloc, &i, Run.init(current_run));
+                    current_run = 0;
+                }
+
+                if (seen[hash(qix)].equal(qix)) {
+                    // index
+                    try writeCursor(&result, alloc, &i, Index.init(hash(qix)));
+                } else if (prev.alpha == qix.alpha) {
+                    // check for a diff
+                    var dr = @as(i16, qix.red) - @as(i16, prev.red);
+                    var dg = @as(i16, qix.green) - @as(i16, prev.green);
+                    var db = @as(i16, qix.blue) - @as(i16, prev.blue);
+
+                    var dg_r = dr - dg;
+                    var dg_b = db - dg;
+
+                    if (dr > -3 and dr < 2 and
+                        dg > -3 and dg < 2 and
+                        db > -3 and db < 2)
+                    {
+                        // Diff
+                        try writeCursor(&result, alloc, &i, Diff.init(@truncate(i2, dr), @truncate(i2, dg), @truncate(i2, db)));
+                    } else if (dg_r > -9 and dg_r < 8 and
+                        dg > -33 and dg < 32 and
+                        dg_b > -9 and dg_b < 8)
+                    {
+                        // Luma
+                        try writeCursor(&result, alloc, &i, Luma.init(@truncate(i4, dg_r), @truncate(i6, dg), @truncate(i4, dg_b)));
+                    } else {
+                        // RGB
+                        try writeCursor(&result, alloc, &i, RGB.init(qix));
+                    }
+                } else {
+                    // RGBA
+                    try writeCursor(&result, alloc, &i, RGBA.init(qix));
+                }
+            }
         }
     }
 
-    try writeCursor(&result, alloc, &i, Tailer{});
+    try writeCursor(&result, alloc, &i, Chunks.Tailer{});
 
     result = try alloc.realloc(result, i);
 
@@ -155,9 +294,27 @@ test "Header properly constructed rbga/all" {
     try std.testing.expectEqualSlices(u8, &bytes, &@bitCast([14]u8, h));
 }
 
+test "Run properly constructed" {
+    var r = Chunks.Run.init(1);
+    try std.testing.expectEqual(@as(u8, 0b11000000), @bitCast(u8, r));
+    var r2 = Chunks.Run.init(16);
+    try std.testing.expectEqual(@as(u8, 0b11001111), @bitCast(u8, r2));
+}
+
+test "Index properly constructed" {
+    var i = Chunks.Index.init(1);
+    try std.testing.expectEqual(@as(u8, 0b00000001), @bitCast(u8, i));
+}
+
 test "sizeOnDisk returns expected values for qoi data structures" {
     try std.testing.expectEqual(@as(usize, 14), sizeOnDisk(Chunks.Header));
     try std.testing.expectEqual(@as(usize, 8), sizeOnDisk(Chunks.Tailer));
+    try std.testing.expectEqual(@as(usize, 4), sizeOnDisk(Chunks.RGB));
+    try std.testing.expectEqual(@as(usize, 5), sizeOnDisk(Chunks.RGBA));
+    try std.testing.expectEqual(@as(usize, 1), sizeOnDisk(Chunks.Index));
+    try std.testing.expectEqual(@as(usize, 1), sizeOnDisk(Chunks.Diff));
+    try std.testing.expectEqual(@as(usize, 1), sizeOnDisk(Chunks.Run));
+    try std.testing.expectEqual(@as(usize, 2), sizeOnDisk(Chunks.Luma));
 }
 
 test "Encode errors on empty buffer" {

@@ -57,7 +57,7 @@ test "Construct/Destruct Qanvas" {
     for (q.buf) |qix, i| {
         const row = @divTrunc(@divTrunc(i, q.width), 16);
         const col = @divTrunc(i % q.width, 16);
-        if (row & 1 == 0 and col & 1 == 0) {
+        if (row & 1 == col & 1) {
             // magenta
             try std.testing.expectEqual(Qixel{}, qix);
         } else {
