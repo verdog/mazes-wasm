@@ -1,6 +1,9 @@
 //! Grid and cell types for constructing mazes
 
 const std = @import("std");
+const qoi = @import("qoi.zig");
+const qan = @import("qanvas.zig");
+
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
@@ -189,7 +192,7 @@ pub const Grid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(Unit, i % self.width);
             var y = @intCast(Unit, @divTrunc(i, self.width));
-            cell.* = Cell.init(self.mem, x, y);
+            cell.* = Cell.init(self.mem, y, x);
         }
     }
 
@@ -260,6 +263,37 @@ pub const Grid = struct {
         }
 
         return ret;
+    }
+
+    pub fn makeQoi(self: Grid) ![]u8 {
+        const cell_size = 18;
+        const border_size = cell_size / 2;
+
+        const width = self.width * cell_size;
+        const height = self.height * cell_size;
+
+        var qanv = try qan.Qanvas.init(self.mem, width + border_size * 2, height + border_size * 2);
+        defer qanv.deinit();
+
+        const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
+        const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
+
+        qanv.clear(background);
+
+        for (self.cells_buf) |cell| {
+            const x1 = cell.col * cell_size + border_size;
+            const x2 = (cell.col + 1) * cell_size + border_size;
+            const y1 = cell.row * cell_size + border_size;
+            const y2 = (cell.row + 1) * cell_size + border_size;
+
+            if (cell.north == null) try qanv.line(wall, x1, x2, y1, y1);
+            if (cell.west == null) try qanv.line(wall, x1, x1, y1, y2);
+
+            if (cell.east == null or !cell.isLinked(cell.east.?)) try qanv.line(wall, x2, x2, y1, y2 + 1);
+            if (cell.south == null or !cell.isLinked(cell.south.?)) try qanv.line(wall, x1, x2 + 1, y2, y2);
+        }
+
+        return qanv.encode();
     }
 };
 
