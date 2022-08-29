@@ -1,4 +1,5 @@
-/// ...
+//! binary tree maze algorithm
+
 const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
@@ -8,16 +9,16 @@ const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
 pub const BinaryTree = struct {
+    /// apply the binary tree maze algorithm to `grid` using random `seed`.
     pub fn on(grid: *Grid, seed: i64) !void {
         var it = grid.cells();
         var prng = std.rand.DefaultPrng.init(@bitCast(u64, seed));
         const random = prng.random();
 
-        // XXX: I think this is putting a double pointer into the loop
-        while (it.next()) |*cell| {
+        while (it.next()) |cell| {
             // Of the cell's north and east neighbors, if it has them at all,
             // pick a random cell from the two and link it.
-            var candidates: [2]?*Cell = .{ cell.*.north, cell.*.east };
+            var candidates: [2]?*Cell = .{ cell.north, cell.east };
             var non_null: u2 = 0;
             for (candidates) |ptr| {
                 if (ptr != null) non_null += 1;
@@ -29,12 +30,12 @@ pub const BinaryTree = struct {
                 },
                 1 => {
                     // link the single non-null neighbor
-                    try cell.*.bLink(candidates[0] orelse candidates[1].?);
+                    try cell.bLink(candidates[0] orelse candidates[1].?);
                 },
                 2 => {
                     // pick a random neighbor
                     var pick = random.intRangeLessThan(u2, 0, 2);
-                    try cell.*.bLink(candidates[pick].?);
+                    try cell.bLink(candidates[pick].?);
                 },
                 else => unreachable,
             }

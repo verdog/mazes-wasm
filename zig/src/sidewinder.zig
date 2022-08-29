@@ -1,4 +1,4 @@
-/// ...
+//! sidewinder maze algorithm
 const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
@@ -11,7 +11,7 @@ pub const Sidewinder = struct {
         var prng = std.rand.DefaultPrng.init(@bitCast(u64, seed));
         const random = prng.random();
 
-        // XXX: should this use the grids allocator?
+        // XXX: should this use the grid's allocator?
         var run = try grid.mem.alloc(?*Cell, grid.width);
         defer grid.mem.free(run);
 

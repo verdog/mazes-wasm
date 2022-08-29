@@ -1,4 +1,4 @@
-//! Grid and cell types for constructing mazes
+//! Grid and Cell types for constructing mazes
 
 const std = @import("std");
 const qoi = @import("qoi.zig");
@@ -8,15 +8,15 @@ const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
-/// Base unit for maze dimensions
+/// base unit for maze dimensions
 pub const Unit = u32;
 
-/// A single maze Cell
+/// a single maze Cell
 pub const Cell = struct {
-    /// Iterator over the cells this cell is connected to.
+    /// iterator over the cells a cell is linked to
     const LinksI = std.AutoHashMap(*Cell, void).KeyIterator;
 
-    /// Iterator over the cells this cell is an orthogonal neighbor to,
+    /// iterator over the cells a cell is an orthogonal neighbor to,
     /// even if the cell isn't actually linked to it.
     pub const NeighborI = struct {
         i: usize = 0,
@@ -65,42 +65,43 @@ pub const Cell = struct {
         self.links_set.deinit();
     }
 
-    /// Bidirectional link.
+    /// bidirectional link
     /// self <---> other
     pub fn bLink(self: *Cell, other: *Cell) !void {
         try self.links_set.put(other, {});
         try other.mLink(self);
     }
 
-    /// Monodirectional link.
+    /// monodirectional link
     /// self ----> other
     pub fn mLink(self: *Cell, other: *Cell) !void {
         try self.links_set.put(other, {});
     }
 
+    /// unlink `self` from `other` in both directions
     pub fn unLink(self: *Cell, other: *Cell) void {
         self.mUnLink(other);
         other.mUnLink(self);
     }
 
-    // monedirectional unlink
+    // monodirectional unlink
     fn mUnLink(self: *Cell, other: *Cell) void {
         // no-ops are fine
         _ = self.links_set.remove(other);
     }
 
-    /// Return true if `self` is linked to `other`
+    /// return true if `self` is linked to `other`
     pub fn isLinked(self: Cell, other: *Cell) bool {
         return self.links_set.contains(other);
     }
 
-    /// Return an iterator over cells that `self` is linked to.
+    /// return an iterator over cells that `self` is linked to.
     pub fn links(self: Cell) Cell.LinksI {
         return self.links_set.keyIterator();
     }
 
-    /// Return an iterator over cells that are orthogonal to `self`.
-    /// Returned cells need not be actually linked to `self`.
+    /// return an iterator over cells that are orthogonal to `self`.
+    /// returned cells need not be actually linked to `self`.
     pub fn neighbors(self: *Cell) Cell.NeighborI {
         return Cell.NeighborI.init(self);
     }
@@ -124,6 +125,7 @@ pub const Grid = struct {
 
     mem: Allocator,
 
+    /// iterator over all cells in the grid
     pub const CellI = struct {
         i: Unit = 0,
         parent: *Grid,
@@ -166,6 +168,7 @@ pub const Grid = struct {
         self.mem.free(self.cells_buf);
     }
 
+    /// return cell at given coordinates. null if it doesn't exist.
     pub fn at(self: *Grid, x: Unit, y: Unit) ?*Cell {
         if (x < 0) return null;
         if (x >= self.width) return null;
@@ -174,15 +177,18 @@ pub const Grid = struct {
         return &self.cells_buf[y * self.width + x];
     }
 
+    /// return a random cell in the grid
     pub fn pickRandom(self: *Grid) *Cell {
         var i = std.rand.Random.intRangeAtMost(Unit, 0, self.size() - 1);
         return &self.cells_buf[i];
     }
 
+    /// return an iterator over all cells in the grid
     pub fn cells(self: *Grid) CellI {
         return Grid.CellI.init(self);
     }
 
+    /// return the amount of cells in the grid
     pub fn size(self: Grid) usize {
         return self.width *| self.height;
     }
@@ -213,8 +219,10 @@ pub const Grid = struct {
         i.* += word.len;
     }
 
-    // TODO change this to accept a buffer or and allocator instead of using its own
-    // TODO benchmark this
+    /// return a string representation of the grid.
+    /// memory for the string will be allocated with
+    /// the allocator that the grid was initialized with.
+    /// TODO test performance
     pub fn makeString(self: Grid) ![]u8 {
         // the output will have a top row of +---+,
         // followed by a grid that takes up 2 rows
@@ -265,6 +273,9 @@ pub const Grid = struct {
         return ret;
     }
 
+    /// return a representation of the grid encoded as a qoi image.
+    /// memory for the returned buffer is allocated by the allocator
+    /// that the grid was initialized with.
     pub fn makeQoi(self: Grid) ![]u8 {
         const cell_size = 18;
         const border_size = cell_size / 2;
