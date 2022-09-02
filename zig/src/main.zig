@@ -10,10 +10,15 @@ const stdout = std.io.getStdOut().writer();
 pub fn main() !void {
     defer _ = heap.detectLeaks();
 
-    var grid = try grd.Grid.init(alloc, 32, 16);
+    var grid = try grd.Grid.init(alloc, 8, 1024);
     defer grid.deinit();
 
-    try maze.Sidewinder.on(&grid, 1);
+    try maze.Sidewinder.on(&grid, 11);
+
+    grid.distances = try grid.at(0, 0).?.distances();
+    var path = try grid.distances.?.pathTo(grid.at(grid.width - 1, grid.height - 1).?);
+    grid.distances.?.deinit();
+    grid.distances = path;
 
     var txt = try grid.makeString();
     defer alloc.free(txt);

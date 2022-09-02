@@ -52,6 +52,38 @@ pub const Cell = struct {
         }
     };
 
+    pub fn distances(self: *Cell) !Distances {
+        var dists = Distances.init(self.mem, self);
+        try dists.dists.put(self, 0);
+
+        var frontier1 = std.ArrayList(*Cell).init(self.mem);
+        defer frontier1.deinit();
+        var frontier2 = std.ArrayList(*Cell).init(self.mem);
+        defer frontier2.deinit();
+
+        var current_frontier = &frontier1;
+        var next_frontier = &frontier2;
+
+        try current_frontier.append(self);
+
+        while (current_frontier.items.len > 0) {
+            next_frontier.clearAndFree();
+
+            for (current_frontier.items) |cellptr| {
+                var it = cellptr.links();
+                while (it.next()) |linked| {
+                    if (dists.get(linked.*)) |_| continue;
+                    try dists.put(linked.*, dists.get(cellptr).? + 1);
+                    try next_frontier.append(linked.*);
+                }
+            }
+
+            std.mem.swap(*std.ArrayList(*Cell), &current_frontier, &next_frontier);
+        }
+
+        return dists;
+    }
+
     pub fn init(mem: Allocator, row: Unit, col: Unit) Cell {
         return Cell{
             .row = row,
@@ -118,10 +150,68 @@ pub const Cell = struct {
     west: ?*Cell = null,
 };
 
+pub const Distances = struct {
+    root: *Cell,
+    alloc: Allocator,
+    dists: std.AutoHashMap(*Cell, Unit),
+
+    pub fn init(alloc: Allocator, root: *Cell) Self {
+        var d: Distances = .{
+            .root = root,
+            .alloc = alloc,
+            .dists = std.AutoHashMap(*Cell, Unit).init(alloc),
+        };
+
+        return d;
+    }
+
+    pub fn deinit(this: *Self) void {
+        this.dists.deinit();
+    }
+
+    pub fn get(this: Self, cell: *Cell) ?Unit {
+        return if (this.dists.contains(cell))
+            this.dists.get(cell).?
+        else
+            return null;
+    }
+
+    pub fn put(this: *Self, cell: *Cell, dist: Unit) !void {
+        try this.dists.put(cell, dist);
+    }
+
+    pub fn it(this: Self) this.dists.KeyIterator {
+        return this.dists;
+    }
+
+    pub fn pathTo(this: Self, goal: *Cell) !Distances {
+        var current = goal;
+
+        var breadcrumbs = Distances.init(this.alloc, this.root);
+        try breadcrumbs.put(current, this.dists.get(current).?);
+
+        while (current != this.root) {
+            var iter = current.links();
+            while (iter.next()) |neighbor| {
+                if (this.dists.get(neighbor.*).? < this.dists.get(current).?) {
+                    try breadcrumbs.put(neighbor.*, this.dists.get(neighbor.*).?);
+                    current = neighbor.*;
+                    break;
+                }
+            }
+        }
+
+        return breadcrumbs;
+    }
+
+    const Self = @This();
+};
+
 pub const Grid = struct {
     width: Unit,
     height: Unit,
     cells_buf: []Cell = undefined,
+    distances: ?Distances = null,
 
     mem: Allocator,
 
@@ -166,6 +256,7 @@ pub const Grid = struct {
             cell.*.deinit();
         }
         self.mem.free(self.cells_buf);
+        if (self.distances) |*distances| distances.deinit();
     }
 
     /// return cell at given coordinates. null if it doesn't exist.
@@ -219,6 +310,16 @@ pub const Grid = struct {
         i.* += word.len;
     }
 
+    fn contentsOf(self: Grid, cell: *Cell) u8 {
+        const contents = "0123456789ABCDEF";
+        if (self.distances) |distances| {
+            if (distances.get(cell)) |dist| {
+                return contents[dist % contents.len];
+            }
+        }
+        return ' ';
+    }
+
     /// return a string representation of the grid.
     /// memory for the string will be allocated with
     /// the allocator that the grid was initialized with.
@@ -253,11 +354,13 @@ pub const Grid = struct {
             var j: usize = 0;
             while (j < self.height) : (j += 1) {
                 var row_slice = self.cells_buf[j * self.width .. j * self.width + self.width];
-
                 // row 1
                 try w(&ret, &i, "|");
-                for (row_slice) |cell| {
-                    try w(&ret, &i, if (cell.east != null and cell.isLinked(cell.east.?) == true) "    " else "   |");
+                for (row_slice) |*cell| {
+                    var data: [4]u8 = "   |".*;
+                    if (cell.east != null and cell.isLinked(cell.east.?)) data[3] = ' ';
+                    data[1] = self.contentsOf(cell);
+                    try w(&ret, &i, &data);
                 }
                 try w(&ret, &i, "\n");
 
@@ -287,11 +390,25 @@ pub const Grid = struct {
         defer qanv.deinit();
 
         const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
+        const path: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
         const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
 
         qanv.clear(background);
 
-        for (self.cells_buf) |cell| {
+        for (self.cells_buf) |*cell| {
+            const x1 = cell.col * cell_size + border_size;
+            const x2 = (cell.col + 1) * cell_size + border_size;
+            const y1 = cell.row * cell_size + border_size;
+            const y2 = (cell.row + 1) * cell_size + border_size;
+
+            if (self.distances) |distances| {
+                if (distances.get(cell)) |_| {
+                    try qanv.fill(path, x1, x2, y1, y2);
+                }
+            }
+        }
+
+        for (self.cells_buf) |*cell| {
             const x1 = cell.col * cell_size + border_size;
             const x2 = (cell.col + 1) * cell_size + border_size;
             const y1 = cell.row * cell_size + border_size;
@@ -472,4 +589,12 @@ test "Grid.makeString() returns a perfect, closed grid before modification" {
         \\
     ;
     try expectEq(true, std.mem.eql(u8, s, m));
+}
+
+test "Create/Destroy distances" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 5, 5);
+    defer g.deinit();
+
+    g.distances = try g.cells_buf[0].distances();
 }

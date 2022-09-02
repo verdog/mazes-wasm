@@ -46,8 +46,8 @@ pub const Chunks = struct {
             var w = width;
             var h = height;
             if (builtin.cpu.arch.endian() == std.builtin.Endian.Little) {
-                w = @byteSwap(u32, w);
-                h = @byteSwap(u32, h);
+                w = @byteSwap(w);
+                h = @byteSwap(h);
             }
             return Header{
                 .width = w,
