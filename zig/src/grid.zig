@@ -204,6 +204,21 @@ pub const Distances = struct {
         return breadcrumbs;
     }
 
+    pub fn max(this: Self) struct { cell: *Cell, distance: Unit } {
+        var dist: Unit = 0;
+        var cell = this.root;
+
+        var iter = this.dists.iterator();
+        while (iter.next()) |entry| {
+            if (entry.value_ptr.* > dist) {
+                dist = entry.value_ptr.*;
+                cell = entry.key_ptr.*;
+            }
+        }
+
+        return .{ .cell = cell, .distance = dist };
+    }
+
     const Self = @This();
 };
 
