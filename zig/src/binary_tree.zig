@@ -10,10 +10,9 @@ const expectEq = std.testing.expectEqual;
 
 pub const BinaryTree = struct {
     /// apply the binary tree maze algorithm to `grid` using random `seed`.
-    pub fn on(grid: *Grid, seed: i64) !void {
+    pub fn on(grid: *Grid) !void {
         var it = grid.cells();
-        var prng = std.rand.DefaultPrng.init(@bitCast(u64, seed));
-        const random = prng.random();
+        const random = grid.prng.random();
 
         while (it.next()) |cell| {
             // Of the cell's north and east neighbors, if it has them at all,
@@ -45,18 +44,18 @@ pub const BinaryTree = struct {
 
 test "Apply BinaryTree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 10, 10);
+    var grid = try Grid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
-    _ = try BinaryTree.on(&grid, 0);
+    _ = try BinaryTree.on(&grid);
 }
 
 test "Binary tree works as expected" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 12, 12);
+    var grid = try Grid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
-    try BinaryTree.on(&grid, 777);
+    try BinaryTree.on(&grid);
 
     var s = try grid.makeString();
     defer alloc.free(s);
@@ -95,10 +94,10 @@ test "Binary tree works as expected" {
 
 test "Distances after binary tree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 12, 12);
+    var grid = try Grid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
-    try BinaryTree.on(&grid, 777);
+    try BinaryTree.on(&grid);
 
     grid.distances = try grid.at(0, 0).?.distances();
 
@@ -139,10 +138,10 @@ test "Distances after binary tree" {
 
 test "Path after binary tree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 12, 12);
+    var grid = try Grid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
-    try BinaryTree.on(&grid, 777);
+    try BinaryTree.on(&grid);
 
     grid.distances = try grid.at(0, 0).?.distances();
     var path = try grid.distances.?.pathTo(grid.at(0, 11).?);

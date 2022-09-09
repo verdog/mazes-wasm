@@ -30,6 +30,20 @@ pub const Qixel = struct {
     pub fn equal(this: @This(), other: @This()) bool {
         return this.red == other.red and this.green == other.green and this.blue == other.blue and this.alpha == other.alpha;
     }
+
+    inline fn byteLerp(from: u8, to: u8, t: f16) u8 {
+        return @floatToInt(u8, @intToFloat(f16, from) + t * (@intToFloat(f16, to) - @intToFloat(f16, from)));
+    }
+
+    pub fn lerp(this: @This(), other: @This(), t: f16) @This() {
+        std.debug.assert(t >= 0 and t <= 1);
+        return .{
+            .red = byteLerp(this.red, other.red, t),
+            .green = byteLerp(this.green, other.green, t),
+            .blue = byteLerp(this.blue, other.blue, t),
+            .alpha = byteLerp(this.alpha, other.alpha, t),
+        };
+    }
 };
 
 pub const Chunks = struct {
@@ -120,8 +134,9 @@ pub const Chunks = struct {
         dg: u6,
         magic: u2 = 0b10,
 
-        pub fn init(dr: i4, dg: i6, db: i4) @This() {
-            return .{ .dr = @intCast(u4, dr) + 8, .dg = @intCast(u6, dg) + 32, .db = @intCast(u4, db) + 8 };
+        pub fn init(dr: i4, dg: i6, db: i4) [2]u8 {
+            var l = Luma{ .dr = @intCast(u4, @as(i5, dr) + 8), .dg = @intCast(u6, @as(i7, dg) + 32), .db = @intCast(u4, @as(i5, db) + 8) };
+            return .{ (@as(u8, l.magic) << 6) | l.dg, (@as(u8, l.dr) << 4) | l.db };
         }
     };
 
@@ -205,57 +220,66 @@ pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32
             // 5. RGB
             // 6. RGBA
 
-            defer prev = qix;
-            defer seen[hash(qix)] = qix;
-
             // end run?
             if (prev.equal(qix)) {
+                // std.debug.print("run...\n", .{});
                 current_run += 1;
                 if (current_run == 62 or j == buffer.len - 1) {
                     // close run; hit limit
+                    // std.debug.print("close run; limit {}\n", .{current_run});
                     try writeCursor(&result, alloc, &i, Run.init(current_run));
                     current_run = 0;
                 }
             } else {
                 if (current_run > 0) {
                     // close run; not a match
+                    // std.debug.print("close run; not a match {}\n", .{current_run});
                     try writeCursor(&result, alloc, &i, Run.init(current_run));
                     current_run = 0;
                 }
 
                 if (seen[hash(qix)].equal(qix)) {
                     // index
+                    // std.debug.print("index\n", .{});
                     try writeCursor(&result, alloc, &i, Index.init(hash(qix)));
-                } else if (prev.alpha == qix.alpha) {
-                    // check for a diff
-                    var dr = @as(i16, qix.red) - @as(i16, prev.red);
-                    var dg = @as(i16, qix.green) - @as(i16, prev.green);
-                    var db = @as(i16, qix.blue) - @as(i16, prev.blue);
-
-                    var dg_r = dr - dg;
-                    var dg_b = db - dg;
-
-                    if (dr > -3 and dr < 2 and
-                        dg > -3 and dg < 2 and
-                        db > -3 and db < 2)
-                    {
-                        // Diff
-                        try writeCursor(&result, alloc, &i, Diff.init(@truncate(i2, dr), @truncate(i2, dg), @truncate(i2, db)));
-                    } else if (dg_r > -9 and dg_r < 8 and
-                        dg > -33 and dg < 32 and
-                        dg_b > -9 and dg_b < 8)
-                    {
-                        // Luma
-                        try writeCursor(&result, alloc, &i, Luma.init(@truncate(i4, dg_r), @truncate(i6, dg), @truncate(i4, dg_b)));
-                    } else {
-                        // RGB
-                        try writeCursor(&result, alloc, &i, RGB.init(qix));
-                    }
                 } else {
-                    // RGBA
-                    try writeCursor(&result, alloc, &i, RGBA.init(qix));
+                    seen[hash(qix)] = qix;
+                    if (prev.alpha == qix.alpha) {
+                        // check for a diff
+                        var dr = @as(i16, qix.red) - @as(i16, prev.red);
+                        var dg = @as(i16, qix.green) - @as(i16, prev.green);
+                        var db = @as(i16, qix.blue) - @as(i16, prev.blue);
+
+                        var dg_r = dr - dg;
+                        var dg_b = db - dg;
+
+                        if (dr > -3 and dr < 2 and
+                            dg > -3 and dg < 2 and
+                            db > -3 and db < 2)
+                        {
+                            // Diff
+                            // std.debug.print("diff\n", .{});
+                            try writeCursor(&result, alloc, &i, Diff.init(@truncate(i2, dr), @truncate(i2, dg), @truncate(i2, db)));
+                        } else if (dg_r > -9 and dg_r < 8 and
+                            dg > -33 and dg < 32 and
+                            dg_b > -9 and dg_b < 8)
+                        {
+                            // Luma
+                            // std.debug.print("luma {} {} {}\n", .{ dg_r, dg, dg_b });
+                            try writeCursor(&result, alloc, &i, Luma.init(@truncate(i4, dg_r), @truncate(i6, dg), @truncate(i4, dg_b)));
+                        } else {
+                            // RGB
+                            // std.debug.print("rgb\n", .{});
+                            try writeCursor(&result, alloc, &i, RGB.init(qix));
+                        }
+                    } else {
+                        // RGBA
+                        // std.debug.print("rgba\n", .{});
+                        try writeCursor(&result, alloc, &i, RGBA.init(qix));
+                    }
                 }
             }
+            prev = qix;
         }
     }
 
@@ -304,6 +328,11 @@ test "Run properly constructed" {
 test "Index properly constructed" {
     var i = Chunks.Index.init(1);
     try std.testing.expectEqual(@as(u8, 0b00000001), @bitCast(u8, i));
+}
+
+test "Luma properly constructed" {
+    var l = Chunks.Luma.init(-4, 8, -6);
+    try std.testing.expectEqualSlices(u8, &.{ 0b10_101000, 0b0100_0010 }, &@bitCast([2]u8, l));
 }
 
 test "sizeOnDisk returns expected values for qoi data structures" {

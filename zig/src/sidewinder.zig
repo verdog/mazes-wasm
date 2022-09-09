@@ -7,11 +7,9 @@ const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
 pub const Sidewinder = struct {
-    pub fn on(grid: *Grid, seed: i64) !void {
-        var prng = std.rand.DefaultPrng.init(@bitCast(u64, seed));
-        const random = prng.random();
+    pub fn on(grid: *Grid) !void {
+        const random = grid.prng.random();
 
-        // XXX: should this use the grid's allocator?
         var run = try grid.mem.alloc(?*Cell, grid.width);
         defer grid.mem.free(run);
 
@@ -42,18 +40,18 @@ pub const Sidewinder = struct {
 
 test "Construct and desruct sidewinder" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 10, 10);
+    var grid = try Grid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
-    _ = try Sidewinder.on(&grid, 0);
+    _ = try Sidewinder.on(&grid);
 }
 
 test "Sidewinder works" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 12, 12);
+    var grid = try Grid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
-    try Sidewinder.on(&grid, 777);
+    try Sidewinder.on(&grid);
 
     var s = try grid.makeString();
     defer alloc.free(s);

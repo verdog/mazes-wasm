@@ -84,11 +84,12 @@ pub const Cell = struct {
         return dists;
     }
 
-    pub fn init(mem: Allocator, row: Unit, col: Unit) Cell {
+    pub fn init(mem: Allocator, prng: *std.rand.DefaultPrng, row: Unit, col: Unit) Cell {
         return Cell{
             .row = row,
             .col = col,
             .mem = mem,
+            .prng = prng,
             .links_set = std.AutoHashMap(*Cell, void).init(mem),
         };
     }
@@ -127,9 +128,36 @@ pub const Cell = struct {
         return self.links_set.contains(other);
     }
 
+    /// return the number of cells this cell is linked to
+    pub fn numLinks(self: Cell) u32 {
+        return self.links_set.count();
+    }
+
     /// return an iterator over cells that `self` is linked to.
     pub fn links(self: Cell) Cell.LinksI {
         return self.links_set.keyIterator();
+    }
+
+    /// return a random cell from the cells that are linked to this cell
+    pub fn randomLink(self: Cell) ?*Cell {
+        // XXX: Assumes the maximum amount of links a cell can have is 4
+        const max_links = 4;
+        var actual_links: u8 = 0;
+        var potential_links = [_]?*Cell{null} ** max_links;
+
+        var iter = self.links();
+        while (iter.next()) |nei| {
+            potential_links[actual_links] = nei.*;
+            actual_links += 1;
+        }
+
+        if (actual_links != 0) {
+            var random = self.prng.random();
+            const choice = random.intRangeLessThan(usize, 0, actual_links);
+            return potential_links[choice];
+        } else {
+            return null;
+        }
     }
 
     /// return an iterator over cells that are orthogonal to `self`.
@@ -138,10 +166,32 @@ pub const Cell = struct {
         return Cell.NeighborI.init(self);
     }
 
+    /// return a random cell from the cells that are orthogonal to this cell
+    pub fn randomNeighbor(self: *Cell) ?*Cell {
+        // XXX: Assumes the maximum amount of neighbors a cell can have is 4
+        const max_neighbors = 4;
+        var actual_neighbors: u8 = 0;
+        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+
+        var iter = self.neighbors();
+        while (iter.next()) |nei| {
+            potential_neighbors[actual_neighbors] = nei;
+            actual_neighbors += 1;
+        }
+
+        if (actual_neighbors != 0) {
+            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
+            return potential_neighbors[choice];
+        } else {
+            return null;
+        }
+    }
+
     row: Unit = 0,
     col: Unit = 0,
 
     mem: Allocator,
+    prng: *std.rand.DefaultPrng,
     links_set: std.AutoHashMap(*Cell, void),
 
     north: ?*Cell = null,
@@ -229,6 +279,7 @@ pub const Grid = struct {
     distances: ?Distances = null,
 
     mem: Allocator,
+    prng: *std.rand.DefaultPrng,
 
     /// iterator over all cells in the grid
     pub const CellI = struct {
@@ -253,12 +304,15 @@ pub const Grid = struct {
         }
     };
 
-    pub fn init(mem: Allocator, w: Unit, h: Unit) !Grid {
+    pub fn init(mem: Allocator, seed: u64, w: Unit, h: Unit) !Grid {
         var g = Grid{
             .width = w,
             .height = h,
             .mem = mem,
+            .prng = try mem.create(std.rand.DefaultPrng),
         };
+
+        g.prng.* = std.rand.DefaultPrng.init(seed);
 
         try g.prepareGrid();
         g.configureCells();
@@ -272,6 +326,7 @@ pub const Grid = struct {
         }
         self.mem.free(self.cells_buf);
         if (self.distances) |*distances| distances.deinit();
+        self.mem.destroy(self.prng);
     }
 
     /// return cell at given coordinates. null if it doesn't exist.
@@ -285,7 +340,7 @@ pub const Grid = struct {
 
     /// return a random cell in the grid
     pub fn pickRandom(self: *Grid) *Cell {
-        var i = std.rand.Random.intRangeAtMost(Unit, 0, self.size() - 1);
+        var i = self.prng.random().intRangeAtMost(usize, 0, self.size() - 1);
         return &self.cells_buf[i];
     }
 
@@ -304,7 +359,7 @@ pub const Grid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(Unit, i % self.width);
             var y = @intCast(Unit, @divTrunc(i, self.width));
-            cell.* = Cell.init(self.mem, y, x);
+            cell.* = Cell.init(self.mem, self.prng, y, x);
         }
     }
 
@@ -394,8 +449,8 @@ pub const Grid = struct {
     /// return a representation of the grid encoded as a qoi image.
     /// memory for the returned buffer is allocated by the allocator
     /// that the grid was initialized with.
-    pub fn makeQoi(self: Grid) ![]u8 {
-        const cell_size = 18;
+    pub fn makeQoi(self: Grid, walls: bool) ![]u8 {
+        const cell_size = 12;
         const border_size = cell_size / 2;
 
         const width = self.width * cell_size;
@@ -405,8 +460,8 @@ pub const Grid = struct {
         defer qanv.deinit();
 
         const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
-        const path: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
-        const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
+
+        var max = if (self.distances) |dists| dists.max() else null;
 
         qanv.clear(background);
 
@@ -416,24 +471,31 @@ pub const Grid = struct {
             const y1 = cell.row * cell_size + border_size;
             const y2 = (cell.row + 1) * cell_size + border_size;
 
-            if (self.distances) |distances| {
-                if (distances.get(cell)) |_| {
-                    try qanv.fill(path, x1, x2, y1, y2);
+            if (self.distances) |dists| {
+                if (dists.get(cell)) |thedist| {
+                    const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
+                    const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
+                    const color = path_low.lerp(path_hi, @intToFloat(f16, thedist) / @intToFloat(f16, max.?.distance));
+
+                    try qanv.fill(color, x1, x2, y1, y2);
                 }
             }
         }
 
-        for (self.cells_buf) |*cell| {
-            const x1 = cell.col * cell_size + border_size;
-            const x2 = (cell.col + 1) * cell_size + border_size;
-            const y1 = cell.row * cell_size + border_size;
-            const y2 = (cell.row + 1) * cell_size + border_size;
+        if (walls) {
+            const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
+            for (self.cells_buf) |*cell| {
+                const x1 = cell.col * cell_size + border_size;
+                const x2 = (cell.col + 1) * cell_size + border_size;
+                const y1 = cell.row * cell_size + border_size;
+                const y2 = (cell.row + 1) * cell_size + border_size;
 
-            if (cell.north == null) try qanv.line(wall, x1, x2, y1, y1);
-            if (cell.west == null) try qanv.line(wall, x1, x1, y1, y2);
+                if (cell.north == null) try qanv.line(wall, x1, x2, y1, y1);
+                if (cell.west == null) try qanv.line(wall, x1, x1, y1, y2);
 
-            if (cell.east == null or !cell.isLinked(cell.east.?)) try qanv.line(wall, x2, x2, y1, y2 + 1);
-            if (cell.south == null or !cell.isLinked(cell.south.?)) try qanv.line(wall, x1, x2 + 1, y2, y2);
+                if (cell.east == null or !cell.isLinked(cell.east.?)) try qanv.line(wall, x2, x2, y1, y2 + 1);
+                if (cell.south == null or !cell.isLinked(cell.south.?)) try qanv.line(wall, x1, x2 + 1, y2, y2);
+            }
         }
 
         return qanv.encode();
@@ -442,16 +504,19 @@ pub const Grid = struct {
 
 test "Construct and destruct a Cell" {
     var alloc = std.testing.allocator;
-    var c = Cell.init(alloc, 0, 0);
+    var prng = std.rand.DefaultPrng.init(0);
+
+    var c = Cell.init(alloc, &prng, 0, 0);
     defer c.deinit();
 }
 
 test "Cell can link to another Cell" {
     var alloc = std.testing.allocator;
+    var prng = std.rand.DefaultPrng.init(0);
 
-    var a = Cell.init(alloc, 0, 0);
+    var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, 0, 0);
+    var b = Cell.init(alloc, &prng, 0, 0);
     defer b.deinit();
 
     try a.bLink(&b);
@@ -462,10 +527,11 @@ test "Cell can link to another Cell" {
 
 test "Cell can unlink after linking another Cell" {
     var alloc = std.testing.allocator;
+    var prng = std.rand.DefaultPrng.init(0);
 
-    var a = Cell.init(alloc, 0, 0);
+    var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, 0, 0);
+    var b = Cell.init(alloc, &prng, 0, 0);
     defer b.deinit();
 
     try a.bLink(&b);
@@ -481,14 +547,15 @@ test "Cell can unlink after linking another Cell" {
 
 test "Cell provides an iterator over its links" {
     var alloc = std.testing.allocator;
+    var prng = std.rand.DefaultPrng.init(0);
 
-    var a = Cell.init(alloc, 0, 0);
+    var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, 1, 0);
+    var b = Cell.init(alloc, &prng, 1, 0);
     defer b.deinit();
-    var c = Cell.init(alloc, 2, 0);
+    var c = Cell.init(alloc, &prng, 2, 0);
     defer c.deinit();
-    var d = Cell.init(alloc, 3, 0);
+    var d = Cell.init(alloc, &prng, 3, 0);
     defer d.deinit();
 
     try a.bLink(&b);
@@ -509,12 +576,13 @@ test "Cell provides an iterator over its links" {
 
 test "Cell provides a list of its neighbors" {
     var alloc = std.testing.allocator;
+    var prng = std.rand.DefaultPrng.init(0);
 
-    var a = Cell.init(alloc, 0, 0);
+    var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, 1, 0);
+    var b = Cell.init(alloc, &prng, 1, 0);
     defer b.deinit();
-    var c = Cell.init(alloc, 2, 0);
+    var c = Cell.init(alloc, &prng, 2, 0);
     defer c.deinit();
 
     b.west = &a;
@@ -533,14 +601,14 @@ test "Cell provides a list of its neighbors" {
 }
 test "Construct and destruct a Grid" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 4, 4);
+    var g = try Grid.init(alloc, 0, 4, 4);
     defer g.deinit();
     try expectEq(@as(@TypeOf(g.size()), 16), g.size());
 }
 
 test "Grid.at(...) out of bounds returns null" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 4, 4);
+    var g = try Grid.init(alloc, 0, 4, 4);
     defer g.deinit();
 
     try expectEq(null, g.at(4, 4));
@@ -550,7 +618,7 @@ test "Grid.at(...) out of bounds returns null" {
 
 test "Grid.cells(...) returns an iterator" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 4, 4);
+    var g = try Grid.init(alloc, 0, 4, 4);
     defer g.deinit();
 
     {
@@ -567,7 +635,7 @@ test "Grid.cells(...) returns an iterator" {
 
 test "Grid.cells(...) iterates over each cell exactly once" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 32, 32);
+    var g = try Grid.init(alloc, 0, 32, 32);
     defer g.deinit();
 
     {
@@ -584,7 +652,7 @@ test "Grid.cells(...) iterates over each cell exactly once" {
 
 test "Grid.makeString() returns a perfect, closed grid before modification" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 5, 5);
+    var g = try Grid.init(alloc, 0, 5, 5);
     defer g.deinit();
 
     var s = try g.makeString();
@@ -608,8 +676,49 @@ test "Grid.makeString() returns a perfect, closed grid before modification" {
 
 test "Create/Destroy distances" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 5, 5);
+    var g = try Grid.init(alloc, 0, 5, 5);
     defer g.deinit();
 
     g.distances = try g.cells_buf[0].distances();
+}
+
+test "Grid cells don't blow up when making random choices" {
+    var alloc = std.testing.allocator;
+    // note that seed one makes the last check succeed
+    var g = try Grid.init(alloc, 1, 5, 5);
+    defer g.deinit();
+
+    var choice = g.prng.random().intRangeLessThan(usize, 0, 10);
+    var choice2 = g.prng.random().intRangeLessThan(usize, 0, 10);
+
+    try std.testing.expect(choice < 10);
+    try std.testing.expect(choice != choice2);
+}
+
+test "Random link returns null when no link exists" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 0, 5, 5);
+    defer g.deinit();
+    try std.testing.expect(g.at(0, 0).?.randomLink() == null);
+}
+
+test "Random link does not return null when a link exists" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 0, 5, 5);
+    defer g.deinit();
+    var first = g.at(0, 0).?;
+    var second = g.at(0, 1).?;
+    try first.bLink(second);
+
+    try std.testing.expect(first.isLinked(second) == true);
+    try std.testing.expect(second.isLinked(first) == true);
+
+    try std.testing.expect(first.randomLink() != null);
+}
+
+test "Random neighbor does not return null" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 0, 5, 5);
+    defer g.deinit();
+    try std.testing.expect(g.at(0, 0).?.randomNeighbor() != null);
 }
