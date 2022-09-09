@@ -12,10 +12,16 @@ const Options = struct {
     text: bool = true,
     qoi: bool = false,
     qoi_walls: bool = true,
-    seed: u64 = 777,
+    seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
     @"type": [64]u8 = u.strBuf(64, "AldousBroder"),
+
+    pub fn withRandomSeed() Options {
+        return .{
+            .seed = @byteSwap(@truncate(u64, @bitCast(u128, std.time.nanoTimestamp()))),
+        };
+    }
 };
 
 fn printOptions(opt: Options) void {
@@ -36,7 +42,7 @@ pub fn main() !void {
     defer _ = heap.detectLeaks();
 
     // parse args
-    var opts = Options{};
+    var opts = Options.withRandomSeed();
     for (std.os.argv) |sarg| {
         const eq = std.mem.eql;
         const arg = std.mem.span(sarg);
