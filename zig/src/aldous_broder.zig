@@ -7,13 +7,19 @@ const Cell = @import("grid.zig").Cell;
 
 pub const AldousBroder = struct {
     pub fn on(grid: *Grid) !void {
-        var cell = grid.pickRandom();
-        var unvisited = grid.size() - 1;
+        // TODO force inline?
+        try AldousBroder.onUntilNVisited(grid, grid.size() - 1);
+    }
 
-        while (unvisited != 0) {
+    // Run the generation algorithm until n cells have been visited.
+    pub fn onUntilNVisited(grid: *Grid, n: usize) !void {
+        var cell = grid.pickRandom();
+        var todo = n;
+
+        while (todo != 0) {
             if (cell.randomNeighbor()) |next| {
                 if (next.numLinks() == 0) {
-                    unvisited -= 1;
+                    todo -= 1;
                     try cell.bLink(next);
                 }
                 cell = next;

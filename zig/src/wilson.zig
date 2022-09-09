@@ -11,10 +11,12 @@ pub const Wilson = struct {
         defer grid.mem.free(visited);
 
         // init
-        for (grid.cells_buf) |_, i| {
-            visited[i] = false;
+        for (grid.cells_buf) |cell, i| {
+            visited[i] = cell.numLinks() > 0;
         }
-        visited[visited.len - 1] = true;
+        if (std.mem.indexOfScalar(bool, visited, true) == null) {
+            visited[visited.len - 1] = true;
+        }
 
         // generate
         while (std.mem.indexOfScalar(bool, visited, false)) |idx| {
