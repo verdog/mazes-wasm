@@ -157,6 +157,13 @@ fn run(opt: Options) !void {
 
         std.debug.print("Done\n", .{});
     }
+
+    std.debug.print("Stats:\n", .{});
+    {
+        var deadends = try grid.deadends();
+        defer grid.mem.free(deadends);
+        std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
+    }
 }
 
 test "Run all tests" {

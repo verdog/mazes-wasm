@@ -187,6 +187,54 @@ pub const Cell = struct {
         }
     }
 
+    /// return a random cell from the cells that are orthogonal to this cell
+    /// and don't have a link to any other cell
+    pub fn randomNeighborUnlinked(self: *Cell) ?*Cell {
+        // XXX: Assumes the maximum amount of neighbors a cell can have is 4
+        const max_neighbors = 4;
+        var actual_neighbors: u8 = 0;
+        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+
+        var iter = self.neighbors();
+        while (iter.next()) |nei| {
+            if (nei.numLinks() == 0) {
+                potential_neighbors[actual_neighbors] = nei;
+                actual_neighbors += 1;
+            }
+        }
+
+        if (actual_neighbors != 0) {
+            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
+            return potential_neighbors[choice];
+        } else {
+            return null;
+        }
+    }
+
+    /// return a random cell from the cells that are orthogonal to this cell
+    /// and do have a link to any other cell
+    pub fn randomNeighborLinked(self: *Cell) ?*Cell {
+        // XXX: Assumes the maximum amount of neighbors a cell can have is 4
+        const max_neighbors = 4;
+        var actual_neighbors: u8 = 0;
+        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+
+        var iter = self.neighbors();
+        while (iter.next()) |nei| {
+            if (nei.numLinks() > 0) {
+                potential_neighbors[actual_neighbors] = nei;
+                actual_neighbors += 1;
+            }
+        }
+
+        if (actual_neighbors != 0) {
+            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
+            return potential_neighbors[choice];
+        } else {
+            return null;
+        }
+    }
+
     row: Unit = 0,
     col: Unit = 0,
 
@@ -347,6 +395,21 @@ pub const Grid = struct {
     /// return an iterator over all cells in the grid
     pub fn cells(self: *Grid) CellI {
         return Grid.CellI.init(self);
+    }
+
+    /// return a list of every cell that is only connected to one other cell.
+    /// caller should free the returned list.
+    pub fn deadends(self: *Grid) ![]*Cell {
+        var list = std.ArrayList(*Cell).init(self.mem);
+        defer list.deinit();
+
+        for (self.cells_buf) |*cell| {
+            if (cell.numLinks() == 1) {
+                try list.append(cell);
+            }
+        }
+
+        return list.toOwnedSlice();
     }
 
     /// return the amount of cells in the grid
