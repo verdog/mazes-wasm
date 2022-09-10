@@ -19,10 +19,14 @@ pub const Wilson = struct {
         }
 
         // generate
-        while (std.mem.indexOfScalar(bool, visited, false)) |idx| {
-            var path = std.ArrayList(*Cell).init(grid.mem);
-            defer path.deinit();
+        var path = std.ArrayList(*Cell).init(grid.mem);
+        defer path.deinit();
+        var search: usize = 0;
 
+        while (std.mem.indexOfScalarPos(bool, visited, search, false)) |idx| {
+            search = idx;
+
+            path.clearRetainingCapacity();
             var cell = &grid.cells_buf[idx];
             try path.append(cell);
 

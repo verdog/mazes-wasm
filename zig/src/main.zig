@@ -4,7 +4,7 @@ const grd = @import("grid.zig");
 const maze = @import("mazes.zig");
 const u = @import("u.zig");
 
-var heap = std.heap.GeneralPurposeAllocator(.{}){};
+var heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 var alloc = heap.allocator();
 const stdout = std.io.getStdOut().writer();
 
@@ -16,6 +16,7 @@ const Options = struct {
     width: u32 = 8,
     height: u32 = 8,
     @"type": [64]u8 = u.strBuf(64, "AldousBroder"),
+    viz: [64]u8 = u.strBuf(64, "Heat"),
 
     pub fn withRandomSeed() Options {
         return .{
@@ -34,12 +35,14 @@ fn printOptions(opt: Options) void {
         \\ - width: {d}
         \\ - height: {d}
         \\ - type: {s}
+        \\ - viz: {s}
         \\
-    , .{ opt.text, opt.qoi, opt.qoi_walls, opt.seed, opt.width, opt.height, std.mem.sliceTo(&opt.@"type", 0) });
+    , .{ opt.text, opt.qoi, opt.qoi_walls, opt.seed, opt.width, opt.height, std.mem.sliceTo(&opt.@"type", 0), std.mem.sliceTo(&opt.viz, 0) });
 }
 
 pub fn main() !void {
-    defer _ = heap.detectLeaks();
+    // defer _ = heap.detectLeaks();
+    defer heap.deinit();
 
     // parse args
     var opts = Options.withRandomSeed();
@@ -87,6 +90,19 @@ pub fn main() !void {
                             }
                         }
                     }
+                } else if (eq(u8, "--viz", left)) {
+                    if (it.next()) |right| {
+                        const vizi = [_][]const u8{
+                            "Heat", "Path",
+                        };
+
+                        for (vizi) |viz| {
+                            if (eq(u8, viz, right)) {
+                                std.mem.copy(u8, &opts.viz, right);
+                                opts.viz[right.len] = 0;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -101,7 +117,9 @@ fn run(opt: Options) !void {
     var grid = try grd.Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
 
+    std.debug.print("Generating... ", .{});
     try maze.onByName(&opt.@"type", &grid);
+    std.debug.print("Done\n", .{});
 
     if (opt.text) {
         var txt = try grid.makeString();
@@ -109,12 +127,35 @@ fn run(opt: Options) !void {
         std.debug.print("{s}\n", .{txt});
     }
 
+    std.debug.print("Calcuating distances... ", .{});
     grid.distances = try grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?.distances();
+    std.debug.print("Done\n", .{});
+
+    if (std.mem.startsWith(u8, &opt.viz, "Path")) {
+        std.debug.print("Finding longest path...", .{});
+
+        // modify distances to be longest path in maze
+        var a = grid.distances.?.max().cell;
+        var a_dists = try a.distances();
+        defer a_dists.deinit();
+
+        var b = a_dists.max().cell;
+        var a_long = try a_dists.pathTo(b);
+
+        grid.distances.?.deinit();
+        grid.distances = a_long;
+
+        std.debug.print("Done\n", .{});
+    }
 
     if (opt.qoi) {
+        std.debug.print("Encoding image... ", .{});
+
         var encoded = try grid.makeQoi(opt.qoi_walls);
         defer alloc.free(encoded);
         try stdout.print("{s}", .{encoded});
+
+        std.debug.print("Done\n", .{});
     }
 }
 

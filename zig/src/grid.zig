@@ -450,7 +450,7 @@ pub const Grid = struct {
     /// memory for the returned buffer is allocated by the allocator
     /// that the grid was initialized with.
     pub fn makeQoi(self: Grid, walls: bool) ![]u8 {
-        const cell_size = 12;
+        const cell_size = 4;
         const border_size = cell_size / 2;
 
         const width = self.width * cell_size;
@@ -459,7 +459,11 @@ pub const Grid = struct {
         var qanv = try qan.Qanvas.init(self.mem, width + border_size * 2, height + border_size * 2);
         defer qanv.deinit();
 
-        const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
+        // white
+        // const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
+
+        // black
+        const background: qoi.Qixel = .{ .red = 10, .green = 10, .blue = 15 };
 
         var max = if (self.distances) |dists| dists.max() else null;
 
@@ -483,7 +487,12 @@ pub const Grid = struct {
         }
 
         if (walls) {
-            const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
+            // black
+            // const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
+
+            // white
+            const wall: qoi.Qixel = .{ .red = 45, .green = 40, .blue = 40 };
+
             for (self.cells_buf) |*cell| {
                 const x1 = cell.col * cell_size + border_size;
                 const x2 = (cell.col + 1) * cell_size + border_size;
