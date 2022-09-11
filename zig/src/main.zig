@@ -16,8 +16,19 @@ const Options = struct {
     seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
-    @"type": [64]u8 = u.strBuf(64, "Fast"),
-    viz: [64]u8 = u.strBuf(64, "Heat"),
+    @"type": [64]u8 = u.strBuf(64, "RecursiveBacktracker"),
+    viz: Vizualization = .heat,
+    grid: Grid = .square,
+
+    const Vizualization = enum {
+        heat,
+        path,
+    };
+
+    const Grid = enum {
+        square,
+        hex,
+    };
 
     pub fn withRandomSeed() Options {
         return .{
@@ -37,8 +48,19 @@ fn printOptions(opt: Options) void {
         \\ - height: {d}
         \\ - type: {s}
         \\ - viz: {s}
+        \\ - grid: {s}
         \\
-    , .{ opt.text, opt.qoi, opt.qoi_walls, opt.seed, opt.width, opt.height, std.mem.sliceTo(&opt.@"type", 0), std.mem.sliceTo(&opt.viz, 0) });
+    , .{
+        opt.text,
+        opt.qoi,
+        opt.qoi_walls,
+        opt.seed,
+        opt.width,
+        opt.height,
+        std.mem.sliceTo(&opt.@"type", 0),
+        u.eString(Options.Vizualization, opt.viz),
+        u.eString(Options.Grid, opt.grid),
+    });
 }
 
 pub fn main() !void {
@@ -93,15 +115,14 @@ pub fn main() !void {
                     }
                 } else if (eq(u8, "--viz", left)) {
                     if (it.next()) |right| {
-                        const vizi = [_][]const u8{
-                            "Heat", "Path",
-                        };
-
-                        for (vizi) |viz| {
-                            if (eq(u8, viz, right)) {
-                                std.mem.copy(u8, &opts.viz, right);
-                                opts.viz[right.len] = 0;
-                            }
+                        if (std.meta.stringToEnum(Options.Vizualization, right)) |e| {
+                            opts.viz = e;
+                        }
+                    }
+                } else if (eq(u8, "--grid", left)) {
+                    if (it.next()) |right| {
+                        if (std.meta.stringToEnum(Options.Grid, right)) |e| {
+                            opts.grid = e;
                         }
                     }
                 }
@@ -109,17 +130,25 @@ pub fn main() !void {
         }
     }
 
-    try run(opts);
+    try dispatch(opts);
 }
 
-fn run(opt: Options) !void {
+fn dispatch(opt: Options) !void {
+    switch (opt.grid) {
+        .square => return try run_square(grd.Grid, opt),
+        .hex => return try run_hex(hgrd.HexGrid, opt),
+    }
+}
+
+// TODO unify run_ fns
+fn run_square(comptime Grid: type, opt: Options) !void {
     printOptions(opt);
 
-    var grid = try grd.Grid.init(alloc, opt.seed, opt.width, opt.height);
+    var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
 
     std.debug.print("Generating... ", .{});
-    try maze.onByName(&opt.@"type", &grid);
+    try maze.onByName(Grid, &opt.@"type", &grid);
     std.debug.print("Done\n", .{});
 
     if (opt.text) {
@@ -132,7 +161,7 @@ fn run(opt: Options) !void {
     grid.distances = try grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?.distances();
     std.debug.print("Done\n", .{});
 
-    if (std.mem.startsWith(u8, &opt.viz, "Path")) {
+    if (opt.viz == .path) {
         std.debug.print("Finding longest path...", .{});
 
         // modify distances to be longest path in maze
@@ -169,6 +198,65 @@ fn run(opt: Options) !void {
         var max = dists.max();
         std.debug.print("- {} longest path\n", .{max.distance});
     }
+}
+
+fn run_hex(comptime Grid: type, opt: Options) !void {
+    printOptions(opt);
+
+    var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
+    defer grid.deinit();
+
+    std.debug.print("Generating... ", .{});
+    try maze.onByName(Grid, &opt.@"type", &grid);
+    std.debug.print("Done\n", .{});
+
+    if (opt.text) {
+        var txt = try hgrd.makeString(&grid);
+        defer alloc.free(txt);
+        std.debug.print("{s}\n", .{txt});
+    }
+
+    // std.debug.print("Calcuating distances... ", .{});
+    // grid.distances = try grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?.distances();
+    // std.debug.print("Done\n", .{});
+
+    // if (opt.viz == .path) {
+    //     std.debug.print("Finding longest path...", .{});
+
+    //     // modify distances to be longest path in maze
+    //     var a = grid.distances.?.max().cell;
+    //     var a_dists = try a.distances();
+    //     defer a_dists.deinit();
+
+    //     var b = a_dists.max().cell;
+    //     var a_long = try a_dists.pathTo(b);
+
+    //     grid.distances.?.deinit();
+    //     grid.distances = a_long;
+
+    //     std.debug.print("Done\n", .{});
+    // }
+
+    if (opt.qoi) {
+        std.debug.print("Encoding image... ", .{});
+
+        var encoded = try hgrd.makeQoi(grid, opt.qoi_walls);
+        defer alloc.free(encoded);
+        try stdout.print("{s}", .{encoded});
+
+        std.debug.print("Done\n", .{});
+    }
+
+    // std.debug.print("Stats:\n", .{});
+    // {
+    //     var deadends = try grid.deadends();
+    //     defer grid.mem.free(deadends);
+    //     std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
+    // }
+    // if (grid.distances) |dists| {
+    //     var max = dists.max();
+    //     std.debug.print("- {} longest path\n", .{max.distance});
+    // }
 }
 
 test "Run all tests" {

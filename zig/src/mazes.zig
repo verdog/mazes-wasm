@@ -1,4 +1,6 @@
 const Grid = @import("grid.zig").Grid;
+const HexGrid = @import("hex_grid.zig").HexGrid;
+
 pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
 pub const Sidewinder = @import("sidewinder.zig").Sidewinder;
 pub const AldousBroder = @import("aldous_broder.zig").AldousBroder;
@@ -11,7 +13,17 @@ const Error = error{
     NoSuchMaze,
 };
 
-pub fn onByName(name: []const u8, grid: *Grid) !void {
+// TODO make this dispatch more clever
+
+pub fn onByName(comptime GridType: type, name: []const u8, grid: anytype) !void {
+    switch (GridType) {
+        Grid => return try onByName_square(name, grid),
+        HexGrid => return try onByName_hex(name, grid),
+        else => @import("std").debug.panic("Unsupported grid type {}\n", .{GridType}),
+    }
+}
+
+fn onByName_square(name: []const u8, grid: *Grid) !void {
     const eq = @import("std").mem.startsWith;
     if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
     if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
@@ -21,6 +33,12 @@ pub fn onByName(name: []const u8, grid: *Grid) !void {
     if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
     if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
 
+    return Error.NoSuchMaze;
+}
+
+fn onByName_hex(name: []const u8, grid: *HexGrid) !void {
+    const eq = @import("std").mem.startsWith;
+    if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
     return Error.NoSuchMaze;
 }
 

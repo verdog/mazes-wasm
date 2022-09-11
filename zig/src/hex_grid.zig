@@ -143,10 +143,39 @@ pub const HexCell = struct {
         return self.getNeighbors(false);
     }
 
+    /// return a random cell from this cell's neighbors that hasn't been linked yet
+    pub fn randomNeighborUnlinked(self: HexCell) ?*HexCell {
+        var my_neighbors = self.neighbors();
+
+        // reduce to only those that are not linked
+        var write: usize = 0;
+        var read: usize = 0;
+        while (read < my_neighbors.len and my_neighbors[read] != null) : (read += 1) {
+            if (my_neighbors[read].?.numLinks() == 0) {
+                my_neighbors[write] = my_neighbors[read];
+                write += 1;
+            }
+        }
+
+        return blk: {
+            if (write == 0) break :blk null;
+            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            break :blk my_neighbors[choice];
+        };
+    }
+
     /// return list of this cell's neighbors. they do need to be linked.
     /// the returned neighbors will be packed into the front of the array.
     pub fn links(self: HexCell) [6]?*HexCell {
         return self.getNeighbors(true);
+    }
+
+    pub fn numLinks(self: HexCell) usize {
+        var count: usize = 0;
+        for (self.linked) |b| {
+            if (b) count += 1;
+        }
+        return count;
     }
 
     /// bidirectional link.
@@ -274,12 +303,17 @@ pub const HexGrid = struct {
         if (y >= self.height) return null;
         return &self.cells_buf[y * self.width + x];
     }
+
+    pub fn pickRandom(self: HexGrid) *HexCell {
+        const i = self.prng.random().intRangeLessThan(usize, 0, self.size());
+        return &self.cells_buf[i];
+    }
 };
 
 pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
     _ = walls;
 
-    const cell_size = 24; // radius
+    const cell_size = 16; // radius
     const fcell_size = @intToFloat(f64, cell_size);
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
     const ib_size = @floatToInt(u32, b_size);
@@ -331,99 +365,92 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
 }
 
 pub fn makeString(grid: *HexGrid) ![]u8 {
-    // /  \__/  \__  -
-    // \__/  \__/  \ |
-    // /  \__/  \__/ -
-    // \__/  \__/  \ |
-    // /  \__/  \__/ -
-    // \__/  \__/  \ |
-    //    \__/  \__/ X Each cell is 2 characters tall, + 1 end character
+    // /   \___/   \___  -
+    // \___/   \___/   \ |
+    // /   \___/   \___/ -
+    // \___/   \___/   \ |
+    // /   \___/   \___/ -
+    // \___/   \___/   \ |
+    //     \___/   \___/ X Each cell is 2 characters tall, + 1 end character
     //
-    // |--|--|--|--X Each cell is 3 characters wide, + 1 end character
-    const width = grid.width * 3 + 2; // + last character + \n
+    // |---|---|---|---X Each cell is 4 characters wide, + 1 end character
+    const width = grid.width * 4 + 2; // + last character + \n
     const height = grid.height * 2 + 1;
     var result = try grid.alloc.alloc(u8, width * height);
 
-    var cursor: usize = 0;
+    var cursor: u32 = 0;
     while (cursor < result.len) {
-        if (@divTrunc(cursor, width) & 1 == 0) {
-            // even row
-            while (cursor % width < width - 2) {
-                // for every 3 characters...
-                const x = @intCast(u32, @divTrunc(cursor % width, 3));
-                if (x & 1 == 0) {
-                    const y = @intCast(u32, @divTrunc(@divTrunc(cursor, width), 2));
-                    var stamp = "   ".*;
-                    const cell = grid.at(x, y);
-                    if (cell == null or cell.?.northwest() == null or !cell.?.isLinked(cell.?.northwest().?))
+        while (cursor % width < width - 2) {
+            // for every 4 characters...
+
+            // find what cell we're in
+            const cursor_row = @divTrunc(cursor, width);
+            const x = @divTrunc(cursor % width, 4);
+            const y = blk: {
+                var row = cursor_row;
+                if (x & 1 == 1)
+                    row += 1;
+                var yy = @divTrunc(row, 2);
+                if (x & 1 == 1)
+                    yy -%= 1;
+                break :blk yy;
+            };
+
+            const odd = (cursor_row & 1 == 0) != (x & 1 == 0);
+
+            if (!odd) {
+                var stamp = "    ".*;
+                const mcell = grid.at(x, y);
+                if (mcell) |cell| {
+                    if (cell.northwest() == null or !cell.isLinked(cell.northwest().?))
                         stamp[0] = '/';
-                    if (cell == null and x == 0) stamp[0] = ' ';
-                    std.mem.copy(u8, result[cursor .. cursor + 3], &stamp);
-                } else {
-                    const y = @intCast(u32, @divTrunc(@divTrunc(cursor, width), 2)) -% 1;
-                    var stamp = "   ".*;
-                    const cell = grid.at(x, y);
-                    if (cell == null or cell.?.southwest() == null or !cell.?.isLinked(cell.?.southwest().?))
+                } else if (cursor_row == height - 1 and x != 0) {
+                    stamp[0] = '/';
+                }
+                std.mem.copy(u8, result[cursor .. cursor + 4], &stamp);
+            } else {
+                var stamp = "    ".*;
+                const mcell = grid.at(x, y);
+                if (mcell) |cell| {
+                    if (cell.southwest() == null or !cell.isLinked(cell.southwest().?))
                         stamp[0] = '\\';
-                    if (cell == null or cell.?.south() == null or !cell.?.isLinked(cell.?.south().?)) {
+                    if (cell.south() == null or !cell.isLinked(cell.south().?)) {
                         stamp[1] = '_';
                         stamp[2] = '_';
+                        stamp[3] = '_';
                     }
-                    std.mem.copy(u8, result[cursor .. cursor + 3], &stamp);
+                } else if (cursor_row == 0) {
+                    stamp[0] = '\\';
+                    stamp[1] = '_';
+                    stamp[2] = '_';
+                    stamp[3] = '_';
                 }
-                cursor += 3;
+
+                if (grid.at(x, y) != null or cursor_row == 0) {}
+
+                std.mem.copy(u8, result[cursor .. cursor + 4], &stamp);
             }
 
-            // finish row
-            if (@divTrunc(cursor % width, 3) & 1 == 0) {
-                var stamp = "/\n".*;
-                const y = @intCast(u32, @divTrunc(cursor, width));
-                if (y == 0) stamp[0] = ' ';
-                std.mem.copy(u8, result[cursor .. cursor + 2], &stamp);
-            } else {
-                var stamp = "\\\n".*;
-                const y = @intCast(u32, @divTrunc(cursor, width));
-                if (y == height - 1) stamp[0] = ' ';
-                std.mem.copy(u8, result[cursor .. cursor + 2], &stamp);
-            }
-            cursor += 2;
-        } else {
-            // odd row
-            while (cursor % width < width - 2) {
-                // for every 3 characters...
-                const x = @intCast(u32, @divTrunc(cursor % width, 3));
-                if (x & 1 == 0) {
-                    const y = @intCast(u32, @divTrunc(@divTrunc(cursor, width), 2));
-                    var stamp = "   ".*;
-                    const cell = grid.at(x, y);
-                    if (cell == null or cell.?.southwest() == null or !cell.?.isLinked(cell.?.southwest().?))
-                        stamp[0] = '\\';
-                    if (cell == null or cell.?.south() == null or !cell.?.isLinked(cell.?.south().?)) {
-                        stamp[1] = '_';
-                        stamp[2] = '_';
-                    }
-                    std.mem.copy(u8, result[cursor .. cursor + 3], &stamp);
-                } else {
-                    const y = @intCast(u32, @divTrunc(@divTrunc(cursor, width), 2)) -% 1;
-                    var stamp = "   ".*;
-                    const cell = grid.at(x, y);
-                    if (cell == null or cell.?.northwest() == null or !cell.?.isLinked(cell.?.northwest().?))
-                        stamp[0] = '/';
-                    std.mem.copy(u8, result[cursor .. cursor + 3], &stamp);
-                }
-                cursor += 3;
-            }
-
-            // finish row
-            if (@divTrunc(cursor % width, 3) & 1 == 0) {
-                var stamp = "\\\n".*;
-                std.mem.copy(u8, result[cursor .. cursor + 2], &stamp);
-            } else {
-                var stamp = "/\n".*;
-                std.mem.copy(u8, result[cursor .. cursor + 2], &stamp);
-            }
-            cursor += 2;
+            cursor += 4;
         }
+
+        // finish row
+        const x = @divTrunc(cursor % width, 4);
+        const cursor_row = @divTrunc(cursor, width);
+        const odd = (cursor_row & 1 == 0) != (x & 1 == 0);
+
+        if (!odd) {
+            result[cursor] = ' ';
+            if (cursor_row != 0)
+                result[cursor] = '/';
+        } else {
+            result[cursor] = ' ';
+            if (cursor_row != height - 1)
+                result[cursor] = '\\';
+        }
+        cursor += 1;
+        result[cursor] = '\n';
+        cursor += 1;
     }
 
     return result;
@@ -638,23 +665,23 @@ test "Hex grid string" {
     defer alloc.free(string88);
 
     const g88 =
-        \\/  \__/  \__/  \__/  \__ 
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\   \__/  \__/  \__/  \__/
+        \\/   \___/   \___/   \___/   \___ 
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\    \___/   \___/   \___/   \___/
         \\
     ;
     try std.testing.expectEqualStrings(g88, string88);
@@ -663,21 +690,21 @@ test "Hex grid string" {
     defer alloc.free(string87);
 
     const g87 =
-        \\/  \__/  \__/  \__/  \__ 
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\/  \__/  \__/  \__/  \__/
-        \\\__/  \__/  \__/  \__/  \
-        \\   \__/  \__/  \__/  \__/
+        \\/   \___/   \___/   \___/   \___ 
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\/   \___/   \___/   \___/   \___/
+        \\\___/   \___/   \___/   \___/   \
+        \\    \___/   \___/   \___/   \___/
         \\
     ;
     try std.testing.expectEqualStrings(g87, string87);
@@ -686,23 +713,23 @@ test "Hex grid string" {
     defer alloc.free(string78);
 
     const g78 =
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\   \__/  \__/  \__/   
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\    \___/   \___/   \___/    
         \\
     ;
     try std.testing.expectEqualStrings(g78, string78);
@@ -711,21 +738,21 @@ test "Hex grid string" {
     defer alloc.free(string77);
 
     const g77 =
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\/  \__/  \__/  \__/  \
-        \\\__/  \__/  \__/  \__/
-        \\   \__/  \__/  \__/   
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\/   \___/   \___/   \___/   \
+        \\\___/   \___/   \___/   \___/
+        \\    \___/   \___/   \___/    
         \\
     ;
     try std.testing.expectEqualStrings(g77, string77);

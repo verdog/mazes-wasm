@@ -4,10 +4,37 @@ const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
+const HexGrid = @import("hex_grid.zig").HexGrid;
+const HexCell = @import("hex_grid.zig").HexCell;
 
 pub const RecursiveBacktracker = struct {
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: anytype) !void {
+        switch (@TypeOf(grid)) {
+            *Grid => return try RecursiveBacktracker.on_Grid(grid),
+            *HexGrid => return try RecursiveBacktracker.on_HexGrid(grid),
+            else => std.debug.panic("", .{}),
+        }
+    }
+
+    fn on_Grid(grid: *Grid) !void {
         var stack = std.ArrayList(*Cell).init(grid.mem);
+        defer stack.deinit();
+
+        try stack.append(grid.pickRandom());
+
+        while (stack.items.len > 0) {
+            if (stack.items[stack.items.len - 1].randomNeighborUnlinked()) |nei| {
+                var cell = stack.items[stack.items.len - 1];
+                try stack.append(nei);
+                try cell.bLink(nei);
+            } else {
+                stack.shrinkRetainingCapacity(stack.items.len - 1);
+            }
+        }
+    }
+
+    fn on_HexGrid(grid: *HexGrid) !void {
+        var stack = std.ArrayList(*HexCell).init(grid.alloc);
         defer stack.deinit();
 
         try stack.append(grid.pickRandom());
