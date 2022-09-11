@@ -31,11 +31,11 @@ pub const Qixel = struct {
         return this.red == other.red and this.green == other.green and this.blue == other.blue and this.alpha == other.alpha;
     }
 
-    inline fn byteLerp(from: u8, to: u8, t: f16) u8 {
-        return @floatToInt(u8, @intToFloat(f16, from) + t * (@intToFloat(f16, to) - @intToFloat(f16, from)));
+    inline fn byteLerp(from: u8, to: u8, t: f64) u8 {
+        return @floatToInt(u8, @intToFloat(f64, from) + t * (@intToFloat(f64, to) - @intToFloat(f64, from)));
     }
 
-    pub fn lerp(this: @This(), other: @This(), t: f16) @This() {
+    pub fn lerp(this: @This(), other: @This(), t: f64) @This() {
         std.debug.assert(t >= 0 and t <= 1);
         return .{
             .red = byteLerp(this.red, other.red, t),

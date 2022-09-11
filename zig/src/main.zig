@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const grd = @import("grid.zig");
+const hgrd = @import("hex_grid.zig");
 const maze = @import("mazes.zig");
 const u = @import("u.zig");
 
@@ -15,7 +16,7 @@ const Options = struct {
     seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
-    @"type": [64]u8 = u.strBuf(64, "AldousBroder"),
+    @"type": [64]u8 = u.strBuf(64, "Fast"),
     viz: [64]u8 = u.strBuf(64, "Heat"),
 
     pub fn withRandomSeed() Options {
@@ -164,10 +165,15 @@ fn run(opt: Options) !void {
         defer grid.mem.free(deadends);
         std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
     }
+    if (grid.distances) |dists| {
+        var max = dists.max();
+        std.debug.print("- {} longest path\n", .{max.distance});
+    }
 }
 
 test "Run all tests" {
     _ = @import("grid.zig");
+    _ = @import("hex_grid.zig");
     _ = @import("mazes.zig");
     _ = @import("qanvas.zig");
     _ = @import("qoi.zig");

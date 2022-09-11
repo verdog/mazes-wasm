@@ -50,21 +50,21 @@ pub const Qanvas = struct {
     }
 
     pub fn line(this: Self, color: Qixel, x1: u32, x2: u32, y1: u32, y2: u32) !void {
-        const x_start = std.math.min(x1, x2);
-        const x_end = std.math.max(x1, x2);
-        const y_start = std.math.min(y1, y2);
-        const y_end = std.math.max(y1, y2);
+        const x_start = @as(i64, x1);
+        const x_end = @as(i64, x2);
+        const y_start = @as(i64, y1);
+        const y_end = @as(i64, y2);
 
         // TODO bounds checking
 
         const dx = x_end - x_start;
         const dy = y_end - y_start;
-        const iters = std.math.max(dx, dy);
+        const iters = std.math.max(try std.math.absInt(dx), try std.math.absInt(dy));
         var i: u32 = 0;
 
         while (i < iters) : (i += 1) {
-            var x = x_start + @divTrunc(i * dx, iters);
-            var y = y_start + @divTrunc(i * dy, iters);
+            var x = @intCast(usize, x_start + @divTrunc(i * dx, iters));
+            var y = @intCast(usize, y_start + @divTrunc(i * dy, iters));
             this.buf[y * this.width + x] = color;
         }
     }

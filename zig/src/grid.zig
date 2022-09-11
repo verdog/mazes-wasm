@@ -542,7 +542,7 @@ pub const Grid = struct {
                 if (dists.get(cell)) |thedist| {
                     const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
                     const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
-                    const color = path_low.lerp(path_hi, @intToFloat(f16, thedist) / @intToFloat(f16, max.?.distance));
+                    const color = path_low.lerp(path_hi, @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance));
 
                     try qanv.fill(color, x1, x2, y1, y2);
                 }
