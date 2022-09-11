@@ -38,6 +38,7 @@ fn onByName_square(name: []const u8, grid: *Grid) !void {
 
 fn onByName_hex(name: []const u8, grid: *HexGrid) !void {
     const eq = @import("std").mem.startsWith;
+    if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
     if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
     return Error.NoSuchMaze;
 }

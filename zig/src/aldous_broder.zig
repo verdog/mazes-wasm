@@ -6,13 +6,13 @@ const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
 
 pub const AldousBroder = struct {
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: anytype) !void {
         // TODO force inline?
         try AldousBroder.onUntilNVisited(grid, grid.size() - 1);
     }
 
     // Run the generation algorithm until n cells have been visited.
-    pub fn onUntilNVisited(grid: *Grid, n: usize) !void {
+    pub fn onUntilNVisited(grid: anytype, n: usize) !void {
         var cell = grid.pickRandom();
         var todo = n;
 

@@ -143,6 +143,19 @@ pub const HexCell = struct {
         return self.getNeighbors(false);
     }
 
+    pub fn randomNeighbor(self: HexCell) ?*HexCell {
+        const my_neighbors = self.neighbors();
+        const count = blk: {
+            var c: usize = 0;
+            for (my_neighbors) |maybe_nei| {
+                if (maybe_nei != null) c += 1;
+            }
+            break :blk c;
+        };
+        const choice = self.prng.random().intRangeLessThan(usize, 0, count);
+        return my_neighbors[choice];
+    }
+
     /// return a random cell from this cell's neighbors that hasn't been linked yet
     pub fn randomNeighborUnlinked(self: HexCell) ?*HexCell {
         var my_neighbors = self.neighbors();
@@ -318,7 +331,7 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
     const ib_size = @floatToInt(u32, b_size);
 
-    const border_size = cell_size;
+    const border_size = cell_size * 8;
 
     const width: u32 = (grid.width * cell_size / 2 * 3) + (cell_size / 2) + (2 * border_size) + 1;
     const height: u32 = (grid.height * 2 * ib_size) + ib_size + (2 * border_size) + 1;
