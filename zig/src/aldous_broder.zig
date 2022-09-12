@@ -4,6 +4,7 @@ const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
+const Distances = @import("grid.zig").Distances;
 
 pub const AldousBroder = struct {
     pub fn on(grid: anytype) !void {
@@ -83,7 +84,7 @@ test "Aldous-Broder distances" {
 
     try AldousBroder.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -123,7 +124,7 @@ test "Aldous broder path" {
 
     try AldousBroder.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

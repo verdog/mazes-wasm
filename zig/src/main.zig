@@ -158,7 +158,7 @@ fn run_square(comptime Grid: type, opt: Options) !void {
     }
 
     std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?.distances();
+    grid.distances = try grd.Distances(grd.Cell).from(grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?);
     std.debug.print("Done\n", .{});
 
     if (opt.viz == .path) {
@@ -166,7 +166,7 @@ fn run_square(comptime Grid: type, opt: Options) !void {
 
         // modify distances to be longest path in maze
         var a = grid.distances.?.max().cell;
-        var a_dists = try a.distances();
+        var a_dists = try grd.Distances(grd.Cell).from(a);
         defer a_dists.deinit();
 
         var b = a_dists.max().cell;
@@ -191,7 +191,7 @@ fn run_square(comptime Grid: type, opt: Options) !void {
     std.debug.print("Stats:\n", .{});
     {
         var deadends = try grid.deadends();
-        defer grid.mem.free(deadends);
+        defer grid.alctr.free(deadends);
         std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
     }
     if (grid.distances) |dists| {
@@ -210,15 +210,15 @@ fn run_hex(comptime Grid: type, opt: Options) !void {
     try maze.onByName(Grid, &opt.@"type", &grid);
     std.debug.print("Done\n", .{});
 
+    std.debug.print("Calcuating distances... ", .{});
+    grid.distances = try grd.Distances(hgrd.HexCell).from(grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?);
+    std.debug.print("Done\n", .{});
+
     if (opt.text) {
         var txt = try hgrd.makeString(&grid);
         defer alloc.free(txt);
         std.debug.print("{s}\n", .{txt});
     }
-
-    // std.debug.print("Calcuating distances... ", .{});
-    // grid.distances = try grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?.distances();
-    // std.debug.print("Done\n", .{});
 
     // if (opt.viz == .path) {
     //     std.debug.print("Finding longest path...", .{});

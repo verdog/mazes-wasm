@@ -10,8 +10,8 @@ pub const Sidewinder = struct {
     pub fn on(grid: *Grid) !void {
         const random = grid.prng.random();
 
-        var run = try grid.mem.alloc(?*Cell, grid.width);
-        defer grid.mem.free(run);
+        var run = try grid.alctr.alloc(?*Cell, grid.width);
+        defer grid.alctr.free(run);
 
         var run_len: usize = 0;
 

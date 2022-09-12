@@ -4,11 +4,12 @@ const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
+const Distances = @import("grid.zig").Distances;
 
 pub const Wilson = struct {
     pub fn on(grid: *Grid) !void {
-        var visited = try grid.mem.alloc(bool, grid.size());
-        defer grid.mem.free(visited);
+        var visited = try grid.alctr.alloc(bool, grid.size());
+        defer grid.alctr.free(visited);
 
         // init
         for (grid.cells_buf) |cell, i| {
@@ -19,7 +20,7 @@ pub const Wilson = struct {
         }
 
         // generate
-        var path = std.ArrayList(*Cell).init(grid.mem);
+        var path = std.ArrayList(*Cell).init(grid.alctr);
         defer path.deinit();
         var search: usize = 0;
 
@@ -104,7 +105,7 @@ test "Wilson distances" {
 
     try Wilson.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -144,7 +145,7 @@ test "Aldous broder path" {
 
     try Wilson.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

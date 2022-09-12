@@ -3,6 +3,7 @@
 const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
+const Distances = @import("grid.zig").Distances;
 const Cell = @import("grid.zig").Cell;
 
 const expect = std.testing.expect;
@@ -99,7 +100,7 @@ test "Distances after binary tree" {
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
 
     var s = try grid.makeString();
     defer alloc.free(s);
@@ -143,7 +144,7 @@ test "Path after binary tree" {
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(0, 11).?);
     grid.distances.?.deinit();
     grid.distances = path;

@@ -3,6 +3,7 @@
 const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
+const Distances = @import("grid.zig").Distances;
 const Cell = @import("grid.zig").Cell;
 
 pub const HuntAndKill = struct {
@@ -92,7 +93,7 @@ test "HuntAndKill distances" {
 
     try HuntAndKill.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -132,7 +133,7 @@ test "HuntAndKill path" {
 
     try HuntAndKill.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

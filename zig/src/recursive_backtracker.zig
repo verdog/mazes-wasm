@@ -4,6 +4,7 @@ const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
+const Distances = @import("grid.zig").Distances;
 const HexGrid = @import("hex_grid.zig").HexGrid;
 const HexCell = @import("hex_grid.zig").HexCell;
 
@@ -17,7 +18,7 @@ pub const RecursiveBacktracker = struct {
     }
 
     fn on_Grid(grid: *Grid) !void {
-        var stack = std.ArrayList(*Cell).init(grid.mem);
+        var stack = std.ArrayList(*Cell).init(grid.alctr);
         defer stack.deinit();
 
         try stack.append(grid.pickRandom());
@@ -34,7 +35,7 @@ pub const RecursiveBacktracker = struct {
     }
 
     fn on_HexGrid(grid: *HexGrid) !void {
-        var stack = std.ArrayList(*HexCell).init(grid.alloc);
+        var stack = std.ArrayList(*HexCell).init(grid.alctr);
         defer stack.deinit();
 
         try stack.append(grid.pickRandom());
@@ -104,7 +105,7 @@ test "RecursiveBacktracker distances" {
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -144,7 +145,7 @@ test "RecursiveBacktracker path" {
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try grid.at(0, 0).?.distances();
+    grid.distances = try Distances.from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

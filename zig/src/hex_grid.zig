@@ -3,15 +3,18 @@
 const std = @import("std");
 const qoi = @import("qoi.zig");
 const qan = @import("qanvas.zig");
+const u = @import("u.zig");
+
+const Distances = @import("grid.zig").Distances;
 
 pub const Error = error{
     HexCellError,
 };
 
 pub const HexCell = struct {
-    pub fn init(alloc: std.mem.Allocator, prng: *std.rand.DefaultPrng, x: u32, y: u32) HexCell {
+    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, x: u32, y: u32) HexCell {
         return HexCell{
-            .alloc = alloc,
+            .alctr = alctr,
             .prng = prng,
             .x = x,
             .y = y,
@@ -244,7 +247,7 @@ pub const HexCell = struct {
     // `linked[i]` is true if this cell is linked to `neighbors[i]`
     linked: [6]bool = [_]bool{false} ** 6,
 
-    alloc: std.mem.Allocator,
+    alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
     x: u32,
     y: u32,
@@ -254,17 +257,17 @@ pub const HexGrid = struct {
     width: u32,
     height: u32,
     cells_buf: []HexCell = undefined,
-    // distances: ?Distances = null,
+    distances: ?Distances(HexCell) = null,
 
-    alloc: std.mem.Allocator,
+    alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
 
-    pub fn init(alloc: std.mem.Allocator, seed: u64, w: u32, h: u32) !HexGrid {
+    pub fn init(alctr: std.mem.Allocator, seed: u64, w: u32, h: u32) !HexGrid {
         var g = HexGrid{
             .width = w,
             .height = h,
-            .alloc = alloc,
-            .prng = try alloc.create(std.rand.DefaultPrng),
+            .alctr = alctr,
+            .prng = try alctr.create(std.rand.DefaultPrng),
         };
 
         g.prng.* = std.rand.DefaultPrng.init(seed);
@@ -276,16 +279,16 @@ pub const HexGrid = struct {
     }
 
     pub fn deinit(self: *HexGrid) void {
-        self.alloc.free(self.cells_buf);
-        self.alloc.destroy(self.prng);
+        self.alctr.free(self.cells_buf);
+        self.alctr.destroy(self.prng);
     }
 
     fn prepareGrid(self: *HexGrid) !void {
-        self.cells_buf = try self.alloc.alloc(HexCell, self.width * self.height);
+        self.cells_buf = try self.alctr.alloc(HexCell, self.width * self.height);
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = HexCell.init(self.alloc, self.prng, x, y);
+            cell.* = HexCell.init(self.alctr, self.prng, x, y);
         }
     }
 
@@ -324,9 +327,7 @@ pub const HexGrid = struct {
 };
 
 pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
-    _ = walls;
-
-    const cell_size = 16; // radius
+    const cell_size = 6; // radius
     const fcell_size = @intToFloat(f64, cell_size);
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
     const ib_size = @floatToInt(u32, b_size);
@@ -336,7 +337,7 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
     const width: u32 = (grid.width * cell_size / 2 * 3) + (cell_size / 2) + (2 * border_size) + 1;
     const height: u32 = (grid.height * 2 * ib_size) + ib_size + (2 * border_size) + 1;
 
-    var qanv = try qan.Qanvas.init(grid.alloc, width, height);
+    var qanv = try qan.Qanvas.init(grid.alctr, width, height);
     defer qanv.deinit();
 
     // colors
@@ -345,33 +346,94 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
 
     qanv.clear(background_color);
 
-    for (grid.cells_buf) |cell| {
-        const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
-        var y_center = border_size + ib_size + (cell.y * ib_size * 2);
-        if (cell.x & 1 == 1) y_center += ib_size;
+    // backgrounds
+    if (grid.distances) |dists| {
+        const max_dist = dists.max().distance;
 
-        const x_far_west = x_center - cell_size;
-        _ = x_far_west;
-        const x_near_west = x_center - cell_size / 2;
-        const x_near_east = x_center + cell_size / 2;
-        const x_far_east = x_center + cell_size;
+        for (grid.cells_buf) |*cell| {
+            const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
+            var y_center = border_size + ib_size + (cell.y * ib_size * 2);
+            if (cell.x & 1 == 1) y_center += ib_size;
 
-        const y_north = @floatToInt(u32, @intToFloat(f64, y_center) - b_size);
-        const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
-        _ = y_south;
+            const x_far_west = x_center - cell_size;
+            const x_near_west = x_center - cell_size / 2;
+            const x_near_east = x_center + cell_size / 2;
+            const x_far_east = x_center + cell_size;
 
-        if (cell.north() == null)
-            try qanv.line(wall_color, x_near_west, x_near_east, y_north, y_north);
-        if (cell.northeast() == null)
-            try qanv.line(wall_color, x_near_east, x_far_east, y_north, y_center);
-        if (cell.southeast() == null or !cell.isLinked(cell.southeast().?))
-            try qanv.line(wall_color, x_far_east, x_near_east, y_center, y_south);
-        if (cell.south() == null or !cell.isLinked(cell.south().?))
-            try qanv.line(wall_color, x_near_east, x_near_west, y_south, y_south);
-        if (cell.southwest() == null or !cell.isLinked(cell.southwest().?))
-            try qanv.line(wall_color, x_near_west, x_far_west, y_south, y_center);
-        if (cell.northwest() == null)
-            try qanv.line(wall_color, x_far_west, x_near_west, y_center, y_north);
+            const y_north = @floatToInt(u32, @intToFloat(f64, y_center) - b_size);
+            const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
+
+            if (dists.get(cell)) |cell_dist| {
+                const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
+                const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
+                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist));
+
+                { // top trapezoid
+                    const lines = y_center - y_north - 1;
+                    var j: u32 = 0;
+                    while (j < lines) : (j += 1) {
+                        const t = @intToFloat(f64, j) / @intToFloat(f64, lines);
+                        const fx_far_west = @intToFloat(f64, x_far_west);
+                        const fx_near_west = @intToFloat(f64, x_near_west);
+                        const fx_near_east = @intToFloat(f64, x_near_east);
+                        const fx_far_east = @intToFloat(f64, x_far_east);
+
+                        const x1 = @floatToInt(u32, u.lerp(fx_near_west, fx_far_west, t) + 0.5);
+                        const x2 = @floatToInt(u32, u.lerp(fx_near_east, fx_far_east, t) + 0.5);
+
+                        try qanv.line(color, x1, x2, y_north + j + 1, y_north + j + 1);
+                    }
+                }
+
+                { // bottom trapezoid
+                    const lines = y_south - y_center;
+                    var j: u32 = 0;
+                    while (j < lines) : (j += 1) {
+                        const t = @intToFloat(f64, j) / @intToFloat(f64, lines);
+                        const fx_far_west = @intToFloat(f64, x_far_west);
+                        const fx_near_west = @intToFloat(f64, x_near_west);
+                        const fx_near_east = @intToFloat(f64, x_near_east);
+                        const fx_far_east = @intToFloat(f64, x_far_east);
+
+                        const x1 = @floatToInt(u32, u.lerp(fx_far_west, fx_near_west, t) + 0.5);
+                        const x2 = @floatToInt(u32, u.lerp(fx_far_east, fx_near_east, t) + 0.5);
+
+                        try qanv.line(color, x1, x2, y_center + j, y_center + j);
+                    }
+                }
+            }
+        }
+    }
+
+    // walls
+    if (walls) {
+        for (grid.cells_buf) |cell| {
+            const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
+            var y_center = border_size + ib_size + (cell.y * ib_size * 2);
+            if (cell.x & 1 == 1) y_center += ib_size;
+
+            const x_far_west = x_center - cell_size;
+            const x_near_west = x_center - cell_size / 2;
+            const x_near_east = x_center + cell_size / 2;
+            const x_far_east = x_center + cell_size;
+
+            const y_north = @floatToInt(u32, @intToFloat(f64, y_center) - b_size);
+            const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
+            if (walls) {
+                if (cell.north() == null)
+                    try qanv.line(wall_color, x_near_west, x_near_east, y_north, y_north);
+                if (cell.northeast() == null)
+                    try qanv.line(wall_color, x_near_east, x_far_east, y_north, y_center);
+                if (cell.southeast() == null or !cell.isLinked(cell.southeast().?))
+                    try qanv.line(wall_color, x_far_east, x_near_east, y_center, y_south);
+                if (cell.south() == null or !cell.isLinked(cell.south().?))
+                    try qanv.line(wall_color, x_near_east, x_near_west, y_south, y_south);
+                if (cell.southwest() == null or !cell.isLinked(cell.southwest().?))
+                    try qanv.line(wall_color, x_near_west, x_far_west, y_south, y_center);
+                if (cell.northwest() == null)
+                    try qanv.line(wall_color, x_far_west, x_near_west, y_center, y_north);
+            }
+        }
     }
 
     return try qanv.encode();
@@ -389,7 +451,7 @@ pub fn makeString(grid: *HexGrid) ![]u8 {
     // |---|---|---|---X Each cell is 4 characters wide, + 1 end character
     const width = grid.width * 4 + 2; // + last character + \n
     const height = grid.height * 2 + 1;
-    var result = try grid.alloc.alloc(u8, width * height);
+    var result = try grid.alctr.alloc(u8, width * height);
 
     var cursor: u32 = 0;
     while (cursor < result.len) {
@@ -420,6 +482,18 @@ pub fn makeString(grid: *HexGrid) ![]u8 {
                 } else if (cursor_row == height - 1 and x != 0) {
                     stamp[0] = '/';
                 }
+
+                {
+                    const contents = "0123456789ABCDEF";
+                    if (grid.distances) |dists| {
+                        if (grid.at(x, y)) |cell| {
+                            if (dists.get(cell)) |dist| {
+                                stamp[1] = contents[dist % contents.len];
+                            }
+                        }
+                    }
+                }
+
                 std.mem.copy(u8, result[cursor .. cursor + 4], &stamp);
             } else {
                 var stamp = "    ".*;

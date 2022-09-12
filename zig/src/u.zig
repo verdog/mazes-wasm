@@ -14,3 +14,8 @@ pub fn eString(comptime e: type, v: e) []const u8 {
     }
     std.debug.panic("Couldn't stringify {}.\n", .{e});
 }
+
+pub fn lerp(from: f64, to: f64, t: f64) f64 {
+    std.debug.assert(t >= 0 and t <= 1);
+    return from + t * (to - from);
+}
