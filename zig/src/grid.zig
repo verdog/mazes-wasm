@@ -761,7 +761,7 @@ test "Create/Destroy distances" {
     var g = try Grid.init(alloc, 0, 5, 5);
     defer g.deinit();
 
-    g.distances = try Distances.from(&g.cells_buf[0]);
+    g.distances = try Distances(Cell).from(&g.cells_buf[0]);
 }
 
 test "Grid cells don't blow up when making random choices" {

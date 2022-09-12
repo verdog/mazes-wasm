@@ -105,7 +105,7 @@ test "Wilson distances" {
 
     try Wilson.on(&grid);
 
-    grid.distances = try Distances.from(grid.at(0, 0).?);
+    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -145,7 +145,7 @@ test "Aldous broder path" {
 
     try Wilson.on(&grid);
 
-    grid.distances = try Distances.from(grid.at(0, 0).?);
+    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

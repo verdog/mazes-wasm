@@ -100,7 +100,7 @@ test "Distances after binary tree" {
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try Distances.from(grid.at(0, 0).?);
+    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
 
     var s = try grid.makeString();
     defer alloc.free(s);
@@ -144,7 +144,7 @@ test "Path after binary tree" {
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try Distances.from(grid.at(0, 0).?);
+    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(0, 11).?);
     grid.distances.?.deinit();
     grid.distances = path;
