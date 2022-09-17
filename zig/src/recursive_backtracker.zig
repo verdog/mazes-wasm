@@ -7,12 +7,15 @@ const Cell = @import("grid.zig").Cell;
 const Distances = @import("grid.zig").Distances;
 const HexGrid = @import("hex_grid.zig").HexGrid;
 const HexCell = @import("hex_grid.zig").HexCell;
+const TriGrid = @import("tri_grid.zig").TriGrid;
+const TriCell = @import("tri_grid.zig").TriCell;
 
 pub const RecursiveBacktracker = struct {
     pub fn on(grid: anytype) !void {
         switch (@TypeOf(grid)) {
             *Grid => return try RecursiveBacktracker.on_Grid(grid),
             *HexGrid => return try RecursiveBacktracker.on_HexGrid(grid),
+            *TriGrid => return try RecursiveBacktracker.on_TriGrid(grid),
             else => std.debug.panic("", .{}),
         }
     }
@@ -36,6 +39,23 @@ pub const RecursiveBacktracker = struct {
 
     fn on_HexGrid(grid: *HexGrid) !void {
         var stack = std.ArrayList(*HexCell).init(grid.alctr);
+        defer stack.deinit();
+
+        try stack.append(grid.pickRandom());
+
+        while (stack.items.len > 0) {
+            if (stack.items[stack.items.len - 1].randomNeighborUnlinked()) |nei| {
+                var cell = stack.items[stack.items.len - 1];
+                try stack.append(nei);
+                try cell.bLink(nei);
+            } else {
+                stack.shrinkRetainingCapacity(stack.items.len - 1);
+            }
+        }
+    }
+
+    fn on_TriGrid(grid: *TriGrid) !void {
+        var stack = std.ArrayList(*TriCell).init(grid.alctr);
         defer stack.deinit();
 
         try stack.append(grid.pickRandom());

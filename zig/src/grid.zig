@@ -258,7 +258,7 @@ pub fn Distances(comptime CellT: type) type {
                     } else {
                         const links = cellptr.links();
                         var i: usize = 0;
-                        while (links[i] != null and i < links.len) : (i += 1) {
+                        while (i < links.len and links[i] != null) : (i += 1) {
                             if (dists.get(links[i].?)) |_| continue;
                             try dists.put(links[i].?, dists.get(cellptr).? + 1);
                             try next_frontier.append(links[i].?);

@@ -1,5 +1,6 @@
 const Grid = @import("grid.zig").Grid;
 const HexGrid = @import("hex_grid.zig").HexGrid;
+const TriGrid = @import("tri_grid.zig").TriGrid;
 
 pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
 pub const Sidewinder = @import("sidewinder.zig").Sidewinder;
@@ -13,37 +14,37 @@ const Error = error{
     NoSuchMaze,
 };
 
-// TODO make this dispatch more clever
+pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !void {
+    const eq = @import("std").mem.startsWith;
 
-pub fn onByName(comptime GridType: type, name: []const u8, grid: anytype) !void {
     switch (GridType) {
-        Grid => return try onByName_square(name, grid),
-        HexGrid => return try onByName_hex(name, grid),
-        else => @import("std").debug.panic("Unsupported grid type {}\n", .{GridType}),
+        Grid => {
+            if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
+            if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
+            if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
+            if (eq(u8, name, "Wilson")) return try Wilson.on(grid);
+            if (eq(u8, name, "Fast")) return try Fast.on(grid);
+            if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
+            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+        },
+        HexGrid => {
+            if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
+            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+        },
+        TriGrid => {
+            // if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
+            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+        },
+        else => return Error.NoSuceMaze,
     }
 }
 
-fn onByName_square(name: []const u8, grid: *Grid) !void {
-    const eq = @import("std").mem.startsWith;
-    if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
-    if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
-    if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
-    if (eq(u8, name, "Wilson")) return try Wilson.on(grid);
-    if (eq(u8, name, "Fast")) return try Fast.on(grid);
-    if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
-    if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-
-    return Error.NoSuchMaze;
-}
-
-fn onByName_hex(name: []const u8, grid: *HexGrid) !void {
-    const eq = @import("std").mem.startsWith;
-    if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
-    if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-    return Error.NoSuchMaze;
-}
-
 test "Test mazes" {
+    // grids
+    _ = @import("grid.zig");
+    _ = @import("hex_grid.zig");
+
+    // algorithms
     _ = @import("binary_tree.zig");
     _ = @import("sidewinder.zig");
     _ = @import("aldous_broder.zig");
