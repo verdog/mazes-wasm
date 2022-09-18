@@ -327,12 +327,12 @@ pub const HexGrid = struct {
 };
 
 pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
-    const cell_size = 6; // radius
+    const cell_size = 12; // radius
     const fcell_size = @intToFloat(f64, cell_size);
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
     const ib_size = @floatToInt(u32, b_size);
 
-    const border_size = cell_size * 8;
+    const border_size = cell_size;
 
     const width: u32 = (grid.width * cell_size / 2 * 3) + (cell_size / 2) + (2 * border_size) + 1;
     const height: u32 = (grid.height * 2 * ib_size) + ib_size + (2 * border_size) + 1;
@@ -341,14 +341,18 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
     defer qanv.deinit();
 
     // colors
-    const background_color: qoi.Qixel = .{ .red = 10, .green = 10, .blue = 15 }; // black
-    const wall_color: qoi.Qixel = .{ .red = 45, .green = 40, .blue = 40 }; // grey
+    const background_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } }; // black
+    const wall_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 45, .green = 40, .blue = 40 } }; // grey
 
     qanv.clear(background_color);
 
     // backgrounds
     if (grid.distances) |dists| {
         const max_dist = dists.max().distance;
+
+        const hue = @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 0, 360));
+        const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         for (grid.cells_buf) |*cell| {
             const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
@@ -364,9 +368,7 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
             const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
 
             if (dists.get(cell)) |cell_dist| {
-                const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
-                const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
-                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist));
+                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist)).to(qoi.RGB);
 
                 { // top trapezoid
                     const lines = y_center - y_north - 1;
@@ -378,8 +380,8 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
                         const fx_near_east = @intToFloat(f64, x_near_east);
                         const fx_far_east = @intToFloat(f64, x_far_east);
 
-                        const x1 = @floatToInt(u32, u.lerp(fx_near_west, fx_far_west, t) + 0.5);
-                        const x2 = @floatToInt(u32, u.lerp(fx_near_east, fx_far_east, t) + 0.5);
+                        const x1 = @floatToInt(u32, u.lerp(fx_near_west, fx_far_west, t));
+                        const x2 = @floatToInt(u32, u.lerp(fx_near_east, fx_far_east, t) + 1);
 
                         try qanv.line(color, x1, x2, y_north + j + 1, y_north + j + 1);
                     }
@@ -395,8 +397,8 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
                         const fx_near_east = @intToFloat(f64, x_near_east);
                         const fx_far_east = @intToFloat(f64, x_far_east);
 
-                        const x1 = @floatToInt(u32, u.lerp(fx_far_west, fx_near_west, t) + 0.5);
-                        const x2 = @floatToInt(u32, u.lerp(fx_far_east, fx_near_east, t) + 0.5);
+                        const x1 = @floatToInt(u32, u.lerp(fx_far_west, fx_near_west, t));
+                        const x2 = @floatToInt(u32, u.lerp(fx_far_east, fx_near_east, t) + 1);
 
                         try qanv.line(color, x1, x2, y_center + j, y_center + j);
                     }

@@ -280,10 +280,10 @@ fn getCoords(cell: TriCell, border_size: u32, tri_width: f64, tri_height: f64) s
 }
 
 pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
-    const tri_width = 24.0; // length of side
+    const tri_width = 10; // length of side
     const tri_height = tri_width * @sqrt(3.0) / 2.0;
 
-    const border_size = @floatToInt(u32, tri_width);
+    const border_size = @floatToInt(u32, tri_width / 2);
     const img_width: u32 = @floatToInt(u32, tri_width / 2.0) * (1 + grid.width) + border_size * 2;
     const img_height: u32 = @floatToInt(u32, tri_height) * grid.height + border_size * 2;
 
@@ -291,8 +291,8 @@ pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
     defer qanv.deinit();
 
     // colors
-    const background_color: qoi.Qixel = .{ .red = 10, .green = 10, .blue = 15 }; // black
-    const wall_color: qoi.Qixel = .{ .red = 45, .green = 40, .blue = 40 }; // grey
+    const background_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } }; // black
+    const wall_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 45, .green = 40, .blue = 40 } }; // grey
 
     qanv.clear(background_color);
 
@@ -300,16 +300,19 @@ pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
     if (grid.distances) |dists| {
         const max_dist = dists.max().distance;
 
+        const hue = @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 0, 360));
+        const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+
         for (grid.cells_buf) |*cell| {
             const xy = getCoords(cell.*, border_size, tri_width, tri_height);
 
             if (dists.get(cell)) |cell_dist| {
-                const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
-                const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
-                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist));
+                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist)).to(qoi.RGB);
                 var line: u32 = 0;
                 while (line < @floatToInt(u32, tri_height)) : (line += 1) {
-                    const t = @intToFloat(f64, line) / tri_height;
+                    const non_eased_t = @intToFloat(f64, line) / tri_height;
+                    const t = -(std.math.cos(std.math.pi * non_eased_t) - 1) / 2;
                     const fx_west = @intToFloat(f64, xy.x_west);
                     const fx_center = @intToFloat(f64, xy.x_center);
                     const fx_east = @intToFloat(f64, xy.x_east);

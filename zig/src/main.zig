@@ -272,7 +272,7 @@ fn run_tri(comptime Grid: type, opt: Options) !void {
     std.debug.print("Done\n", .{});
 
     std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try tgrd.Distances.from(grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?);
+    grid.distances = try tgrd.Distances.from(grid.pickRandom());
     std.debug.print("Done\n", .{});
 
     // if (opt.text) {

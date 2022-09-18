@@ -2,6 +2,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const u = @import("u.zig");
 
 pub const EncodeError = error{
     QoiMalformedBuffer,
@@ -21,30 +22,96 @@ pub const Colorspace = enum(u8) {
     all_linear = 1,
 };
 
-pub const Qixel = struct {
-    red: u8 = 255,
+pub const RGB = struct {
+    red: u8 = 0,
     green: u8 = 0,
-    blue: u8 = 255,
-    alpha: u8 = 255,
+    blue: u8 = 0,
 
-    pub fn equal(this: @This(), other: @This()) bool {
-        return this.red == other.red and this.green == other.green and this.blue == other.blue and this.alpha == other.alpha;
-    }
-
-    inline fn byteLerp(from: u8, to: u8, t: f64) u8 {
-        return @floatToInt(u8, @intToFloat(f64, from) + t * (@intToFloat(f64, to) - @intToFloat(f64, from)));
-    }
-
-    pub fn lerp(this: @This(), other: @This(), t: f64) @This() {
-        std.debug.assert(t >= 0 and t <= 1);
-        return .{
-            .red = byteLerp(this.red, other.red, t),
-            .green = byteLerp(this.green, other.green, t),
-            .blue = byteLerp(this.blue, other.blue, t),
-            .alpha = byteLerp(this.alpha, other.alpha, t),
-        };
+    pub fn lerp(this: RGB, other: RGB, t: f64) RGB {
+        // TODO
+        _ = other;
+        _ = t;
+        return this;
     }
 };
+
+pub const HSV = struct {
+    hue: f32 = 0,
+    saturation: f32 = 0,
+    value: f32 = 0,
+
+    pub fn lerp(this: HSV, other: HSV, t: f64) HSV {
+        var dhue = other.hue - this.hue;
+        dhue = @mod(dhue + 180, 360) - 180;
+
+        return .{
+            .hue = @mod(@floatCast(f32, u.lerp(this.hue, this.hue + dhue, t)), 360),
+            .saturation = @floatCast(f32, u.lerp(this.saturation, other.saturation, t)),
+            .value = @floatCast(f32, u.lerp(this.value, other.value, t)),
+        };
+    }
+
+    pub fn to(hsv: HSV, comptime Space: type) Space {
+        switch (Space) {
+            RGB => {
+                std.debug.assert(hsv.hue >= 0);
+                std.debug.assert(hsv.hue < 360);
+                std.debug.assert(hsv.saturation >= 0);
+                std.debug.assert(hsv.saturation < 1);
+                std.debug.assert(hsv.value >= 0);
+                std.debug.assert(hsv.value < 1);
+
+                const chroma = hsv.saturation * hsv.value;
+                const hprime = hsv.hue / 60;
+                const component = blk: {
+                    const c = @mod(hprime, 2.0) - 1.0;
+                    break :blk std.math.fabs(c);
+                };
+                const x = chroma * (1 - component);
+
+                const uchroma = @floatToInt(u8, chroma * 256);
+                const ux = @floatToInt(u8, x * 256);
+
+                var rgb =
+                    if (hprime < 1) RGB{ .red = uchroma, .green = ux, .blue = 0 } else if (hprime < 2) RGB{ .red = ux, .green = uchroma, .blue = 0 } else if (hprime < 3) RGB{ .red = 0, .green = uchroma, .blue = ux } else if (hprime < 4) RGB{ .red = 0, .green = ux, .blue = uchroma } else if (hprime < 5) RGB{ .red = ux, .green = 0, .blue = uchroma } else if (hprime < 6) RGB{ .red = uchroma, .green = 0, .blue = ux } else unreachable;
+
+                const m = @floatToInt(u8, hsv.value * 256) - uchroma;
+                rgb.red += m;
+                rgb.green += m;
+                rgb.blue += m;
+
+                return rgb;
+            },
+            else => @compileError(""),
+        }
+    }
+};
+
+pub fn Qixel(comptime Space: type) type {
+    return struct {
+        colors: Space = Space{},
+        alpha: u8 = 255,
+
+        pub fn equal(this: @This(), other: @This()) bool {
+            return std.mem.eql(u8, std.mem.asBytes(&this.colors), std.mem.asBytes(&other.colors)) and this.alpha == other.alpha;
+        }
+
+        pub fn lerp(this: @This(), other: @This(), t: f64) @This() {
+            std.debug.assert(t >= 0 and t <= 1);
+            return .{
+                .colors = this.colors.lerp(other.colors, t),
+                .alpha = other.alpha, // TODO should lerp
+            };
+        }
+
+        pub fn to(this: @This(), comptime Spc: type) Qixel(Spc) {
+            return .{
+                .colors = this.colors.to(Spc),
+                .alpha = this.alpha,
+            };
+        }
+    };
+}
 
 pub const Chunks = struct {
     pub const Header = packed struct {
@@ -72,14 +139,14 @@ pub const Chunks = struct {
         }
     };
 
-    pub const RGB = packed struct {
+    pub const qRGB = packed struct {
         magic: u8 = 0b11111110,
         red: u8 = 0,
         green: u8 = 0,
         blue: u8 = 0,
 
-        pub fn init(qix: Qixel) @This() {
-            return @This(){ .red = qix.red, .green = qix.green, .blue = qix.blue };
+        pub fn init(qix: Qixel(RGB)) @This() {
+            return @This(){ .red = qix.colors.red, .green = qix.colors.green, .blue = qix.colors.blue };
         }
     };
 
@@ -90,8 +157,8 @@ pub const Chunks = struct {
         blue: u8 = 0,
         alpha: u8 = 0,
 
-        pub fn init(qix: Qixel) @This() {
-            return @This(){ .red = qix.red, .green = qix.green, .blue = qix.blue, .alpha = qix.alpha };
+        pub fn init(qix: Qixel(RGB)) @This() {
+            return @This(){ .red = qix.colors.red, .green = qix.colors.green, .blue = qix.colors.blue, .alpha = qix.alpha };
         }
     };
 
@@ -180,12 +247,12 @@ fn writeCursor(buffer: *[]u8, alloc: std.mem.Allocator, i: *usize, data: anytype
     i.* += len;
 }
 
-fn hash(qix: Qixel) u6 {
+fn hash(qix: Qixel(RGB)) u6 {
     // a pixel of all 255s will add up to 6630, so u16s can handle the math
-    return @truncate(u6, @as(u16, qix.red) * 3 + @as(u16, qix.green) * 5 + @as(u16, qix.blue) * 7 + @as(u16, qix.alpha) * 11);
+    return @truncate(u6, @as(u16, qix.colors.red) * 3 + @as(u16, qix.colors.green) * 5 + @as(u16, qix.colors.blue) * 7 + @as(u16, qix.alpha) * 11);
 }
 
-pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32, channels: Channels, colorspace: Colorspace) ![]u8 {
+pub fn encode(buffer: []Qixel(RGB), alloc: std.mem.Allocator, width: u32, height: u32, channels: Channels, colorspace: Colorspace) ![]u8 {
     if (buffer.len == 0) {
         return EncodeError.QoiMalformedBuffer;
     }
@@ -198,15 +265,15 @@ pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32
     var i: usize = 0;
 
     {
-        const RGB = Chunks.RGB;
+        const qRGB = Chunks.qRGB;
         const RGBA = Chunks.RGBA;
         const Run = Chunks.Run;
         const Index = Chunks.Index;
         const Diff = Chunks.Diff;
         const Luma = Chunks.Luma;
 
-        var prev = Qixel{ .red = 0, .green = 0, .blue = 0, .alpha = 255 };
-        var seen: [64]Qixel = .{.{ .red = 0, .green = 0, .blue = 0, .alpha = 0 }} ** 64;
+        var prev = Qixel(RGB){ .colors = .{ .red = 0, .green = 0, .blue = 0 }, .alpha = 255 };
+        var seen: [64]Qixel(RGB) = .{.{ .colors = .{ .red = 0, .green = 0, .blue = 0 }, .alpha = 0 }} ** 64;
         var current_run: u6 = 0;
 
         try writeCursor(&result, alloc, &i, Chunks.Header.init(width, height, channels, colorspace));
@@ -246,9 +313,9 @@ pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32
                     seen[hash(qix)] = qix;
                     if (prev.alpha == qix.alpha) {
                         // check for a diff
-                        var dr = @as(i16, qix.red) - @as(i16, prev.red);
-                        var dg = @as(i16, qix.green) - @as(i16, prev.green);
-                        var db = @as(i16, qix.blue) - @as(i16, prev.blue);
+                        var dr = @as(i16, qix.colors.red) - @as(i16, prev.colors.red);
+                        var dg = @as(i16, qix.colors.green) - @as(i16, prev.colors.green);
+                        var db = @as(i16, qix.colors.blue) - @as(i16, prev.colors.blue);
 
                         var dg_r = dr - dg;
                         var dg_b = db - dg;
@@ -270,7 +337,7 @@ pub fn encode(buffer: []Qixel, alloc: std.mem.Allocator, width: u32, height: u32
                         } else {
                             // RGB
                             // std.debug.print("rgb\n", .{});
-                            try writeCursor(&result, alloc, &i, RGB.init(qix));
+                            try writeCursor(&result, alloc, &i, qRGB.init(qix));
                         }
                     } else {
                         // RGBA

@@ -11,14 +11,14 @@ const Qixel = qoi.Qixel;
 pub const Qanvas = struct {
     width: u32,
     height: u32,
-    buf: []Qixel,
+    buf: []Qixel(qoi.RGB),
     allocator: Allocator,
 
     pub fn init(alloc: Allocator, width: u32, height: u32) !Qanvas {
         var q = Qanvas{
             .width = width,
             .height = height,
-            .buf = try alloc.alloc(Qixel, width * height),
+            .buf = try alloc.alloc(Qixel(qoi.RGB), width * height),
             .allocator = alloc,
         };
 
@@ -29,10 +29,10 @@ pub const Qanvas = struct {
             const col = @divTrunc(i % width, grid_scale);
             if (row & 1 == col & 1) {
                 // magenta
-                qix.* = Qixel{};
+                qix.* = Qixel(qoi.RGB){};
             } else {
                 // blank
-                qix.* = Qixel{ .red = 0, .green = 0, .blue = 0 };
+                qix.* = Qixel(qoi.RGB){ .colors = .{ .red = 0, .green = 0, .blue = 0 } };
             }
         }
 
@@ -43,13 +43,21 @@ pub const Qanvas = struct {
         this.allocator.free(this.buf);
     }
 
-    pub fn clear(this: Self, color: Qixel) void {
-        for (this.buf) |*qix| {
-            qix.* = color;
+    pub fn clear(this: Self, color: anytype) void {
+        switch (@TypeOf(color)) {
+            Qixel(qoi.RGB) => {
+                for (this.buf) |*qix| {
+                    qix.* = color;
+                }
+            },
+            Qixel(qoi.HSV) => {
+                return this.clear(Qixel(qoi.RGB){ .colors = color.colors.toRGB, .alpha = this.alpha });
+            },
+            else => @compileError(""),
         }
     }
 
-    pub fn line(this: Self, color: Qixel, x1: u32, x2: u32, y1: u32, y2: u32) !void {
+    pub fn line(this: Self, color: Qixel(qoi.RGB), x1: u32, x2: u32, y1: u32, y2: u32) !void {
         const x_start = @as(i64, x1);
         const x_end = @as(i64, x2);
         const y_start = @as(i64, y1);
@@ -69,7 +77,7 @@ pub const Qanvas = struct {
         }
     }
 
-    pub fn fill(this: Self, color: Qixel, x1: u32, x2: u32, y1: u32, y2: u32) !void {
+    pub fn fill(this: Self, color: Qixel(qoi.RGB), x1: u32, x2: u32, y1: u32, y2: u32) !void {
         const x_start = std.math.min(x1, x2);
         const x_end = std.math.max(x1, x2);
         var y_start = std.math.min(y1, y2);

@@ -523,7 +523,7 @@ pub const Grid = struct {
     /// memory for the returned buffer is allocated by the allocator
     /// that the grid was initialized with.
     pub fn makeQoi(self: Grid, walls: bool) ![]u8 {
-        const cell_size = 4;
+        const cell_size = 6;
         const border_size = cell_size / 2;
 
         const width = self.width * cell_size;
@@ -536,7 +536,10 @@ pub const Grid = struct {
         // const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
 
         // black
-        const background: qoi.Qixel = .{ .red = 10, .green = 10, .blue = 15 };
+        const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
+        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         var max = if (self.distances) |dists| dists.max() else null;
 
@@ -550,9 +553,7 @@ pub const Grid = struct {
 
             if (self.distances) |dists| {
                 if (dists.get(cell)) |thedist| {
-                    const path_low: qoi.Qixel = .{ .red = 220, .green = 100, .blue = 100 };
-                    const path_hi: qoi.Qixel = .{ .red = 20, .green = 60, .blue = 102 };
-                    const color = path_low.lerp(path_hi, @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance));
+                    const color = path_low.lerp(path_hi, @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)).to(qoi.RGB);
 
                     try qanv.fill(color, x1, x2, y1, y2);
                 }
@@ -564,7 +565,7 @@ pub const Grid = struct {
             // const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
 
             // white
-            const wall: qoi.Qixel = .{ .red = 45, .green = 40, .blue = 40 };
+            const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 45, .green = 40, .blue = 40 } };
 
             for (self.cells_buf) |*cell| {
                 const x1 = cell.col * cell_size + border_size;
