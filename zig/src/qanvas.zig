@@ -53,7 +53,7 @@ pub const Qanvas = struct {
             Qixel(qoi.HSV) => {
                 return this.clear(Qixel(qoi.RGB){ .colors = color.colors.toRGB, .alpha = this.alpha });
             },
-            else => @compileError(""),
+            else => @compileError("Unsupported Qixel"),
         }
     }
 
@@ -117,10 +117,10 @@ test "Construct/Destruct Qanvas" {
         const col = @divTrunc(i % q.width, 16);
         if (row & 1 == col & 1) {
             // magenta
-            try std.testing.expectEqual(Qixel{}, qix);
+            try std.testing.expectEqual(Qixel(qoi.RGB){}, qix);
         } else {
             // blank
-            try std.testing.expectEqual(Qixel{ .red = 0, .green = 0, .blue = 0 }, qix);
+            try std.testing.expectEqual(Qixel(qoi.RGB){ .colors = .{ .red = 0, .green = 0, .blue = 0 } }, qix);
         }
     }
 

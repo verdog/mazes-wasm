@@ -23,9 +23,9 @@ pub const Colorspace = enum(u8) {
 };
 
 pub const RGB = struct {
-    red: u8 = 0,
+    red: u8 = 255,
     green: u8 = 0,
-    blue: u8 = 0,
+    blue: u8 = 255,
 
     pub fn lerp(this: RGB, other: RGB, t: f64) RGB {
         // TODO
@@ -405,7 +405,7 @@ test "Luma properly constructed" {
 test "sizeOnDisk returns expected values for qoi data structures" {
     try std.testing.expectEqual(@as(usize, 14), sizeOnDisk(Chunks.Header));
     try std.testing.expectEqual(@as(usize, 8), sizeOnDisk(Chunks.Tailer));
-    try std.testing.expectEqual(@as(usize, 4), sizeOnDisk(Chunks.RGB));
+    try std.testing.expectEqual(@as(usize, 4), sizeOnDisk(Chunks.qRGB));
     try std.testing.expectEqual(@as(usize, 5), sizeOnDisk(Chunks.RGBA));
     try std.testing.expectEqual(@as(usize, 1), sizeOnDisk(Chunks.Index));
     try std.testing.expectEqual(@as(usize, 1), sizeOnDisk(Chunks.Diff));
@@ -414,14 +414,15 @@ test "sizeOnDisk returns expected values for qoi data structures" {
 }
 
 test "Encode errors on empty buffer" {
-    var buf: []Qixel = &.{};
+    var buf: []Qixel(RGB) = &.{};
     var alloc = std.testing.allocator;
 
     try std.testing.expectError(EncodeError.QoiMalformedBuffer, encode(buf, alloc, 0, 0, Channels.rgba, Colorspace.alpha_linear));
 }
 
 test "Encode errors on bad dimensions" {
-    var buf = [_]Qixel{ Qixel{}, Qixel{}, Qixel{}, Qixel{} };
+    const QixelT = Qixel(RGB);
+    var buf = [_]QixelT{ QixelT{}, QixelT{}, QixelT{}, QixelT{} };
     var alloc = std.testing.allocator;
 
     try std.testing.expectError(EncodeError.QoiMalformedBuffer, encode(&buf, alloc, 0, 0, Channels.rgba, Colorspace.alpha_linear));
@@ -431,8 +432,9 @@ test "Encode errors on bad dimensions" {
 }
 
 test "Encode begins with a header and ends with a tailer" {
+    const QixelT = Qixel(RGB);
     var alloc = std.testing.allocator;
-    var buf = try alloc.alloc(Qixel, 128 * 128);
+    var buf = try alloc.alloc(QixelT, 128 * 128);
     defer alloc.free(buf);
     var encoded = try encode(buf, alloc, 128, 128, Channels.rgb, Colorspace.alpha_linear);
     defer alloc.free(encoded);

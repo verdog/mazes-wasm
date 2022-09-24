@@ -1,6 +1,13 @@
-const Grid = @import("grid.zig").Grid;
-const HexGrid = @import("hex_grid.zig").HexGrid;
-const TriGrid = @import("tri_grid.zig").TriGrid;
+pub const Grid = @import("grid.zig").Grid;
+pub const Cell = @import("grid.zig").Cell;
+pub const HexGrid = @import("hex_grid.zig").HexGrid;
+pub const HexCell = @import("hex_grid.zig").HexCell;
+pub const TriGrid = @import("tri_grid.zig").TriGrid;
+pub const TriCell = @import("tri_grid.zig").TriCell;
+pub const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
+pub const UpsilonCell = @import("upsilon_grid.zig").UpsilonCell;
+
+pub const Distances = @import("grid.zig").Distances;
 
 pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
 pub const Sidewinder = @import("sidewinder.zig").Sidewinder;
@@ -19,6 +26,7 @@ pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !voi
 
     switch (GridType) {
         Grid => {
+            if (eq(u8, name, "None")) return;
             if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
             if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
             if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
@@ -28,14 +36,37 @@ pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !voi
             if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
         },
         HexGrid => {
+            if (eq(u8, name, "None")) return;
             if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
             if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
         },
         TriGrid => {
-            // if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
+            if (eq(u8, name, "None")) return;
             if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
         },
-        else => return Error.NoSuceMaze,
+        UpsilonGrid => {
+            if (eq(u8, name, "None")) return;
+            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+        },
+        else => return Error.NoSuchMaze,
+    }
+}
+
+pub fn makeString(comptime GridT: type, grid: *GridT) ![]u8 {
+    switch (GridT) {
+        Grid => return try grid.makeString(),
+        HexGrid => return try @import("hex_grid.zig").makeString(grid),
+        else => return Error.NoSuchMaze,
+    }
+}
+
+pub fn makeQoi(grid: anytype, walls: bool) ![]u8 {
+    switch (@TypeOf(grid)) {
+        Grid => return try grid.makeQoi(walls),
+        HexGrid => return try @import("hex_grid.zig").makeQoi(grid, walls),
+        TriGrid => return try @import("tri_grid.zig").makeQoi(grid, walls),
+        UpsilonGrid => return try @import("upsilon_grid.zig").makeQoi(grid, walls),
+        else => return Error.NoSuchMaze,
     }
 }
 
@@ -43,6 +74,8 @@ test "Test mazes" {
     // grids
     _ = @import("grid.zig");
     _ = @import("hex_grid.zig");
+    _ = @import("tri_grid.zig");
+    _ = @import("upsilon_grid.zig");
 
     // algorithms
     _ = @import("binary_tree.zig");

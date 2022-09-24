@@ -323,7 +323,7 @@ pub fn Distances(comptime CellT: type) type {
                 }
             }
 
-            return .{ .cell = cell, .distance = dist };
+            return .{ .cell = cell, .distance = if (dist != 0) dist else std.math.maxInt(u32) };
         }
 
         const Self = @This();
