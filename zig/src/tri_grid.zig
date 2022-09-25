@@ -212,6 +212,7 @@ pub const TriGrid = struct {
     pub fn deinit(self: *TriGrid) void {
         self.alctr.free(self.cells_buf);
         self.alctr.destroy(self.prng);
+        if (self.distances) |*d| d.deinit();
     }
 
     fn prepareGrid(self: *TriGrid) !void {
@@ -279,8 +280,8 @@ fn getCoords(cell: TriCell, border_size: u32, tri_width: f64, tri_height: f64) s
     };
 }
 
-pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
-    const tri_width = 10; // length of side
+pub fn makeQanvas(grid: TriGrid, walls: bool, scale: usize) !qan.Qanvas {
+    const tri_width = @intToFloat(f64, scale); // length of side
     const tri_height = tri_width * @sqrt(3.0) / 2.0;
 
     const border_size = @floatToInt(u32, tri_width / 2);
@@ -288,7 +289,6 @@ pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
     const img_height: u32 = @floatToInt(u32, tri_height) * grid.height + border_size * 2;
 
     var qanv = try qan.Qanvas.init(grid.alctr, img_width, img_height);
-    defer qanv.deinit();
 
     // colors
     const background_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } }; // black
@@ -308,24 +308,25 @@ pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
             const xy = getCoords(cell.*, border_size, tri_width, tri_height);
 
             if (dists.get(cell)) |cell_dist| {
-                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist)).to(qoi.RGB);
+                const non_eased_color_t = @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist);
+                const color_t = -(std.math.cos(std.math.pi * non_eased_color_t) - 1) / 2;
+                const color = path_low.lerp(path_hi, color_t).to(qoi.RGB);
                 var line: u32 = 0;
                 while (line < @floatToInt(u32, tri_height)) : (line += 1) {
-                    const non_eased_t = @intToFloat(f64, line) / tri_height;
-                    const t = -(std.math.cos(std.math.pi * non_eased_t) - 1) / 2;
+                    const line_t = @intToFloat(f64, line) / tri_height;
                     const fx_west = @intToFloat(f64, xy.x_west);
                     const fx_center = @intToFloat(f64, xy.x_center);
                     const fx_east = @intToFloat(f64, xy.x_east);
 
                     const x1 = if (cell.isUpright())
-                        @floatToInt(u32, u.lerp(fx_center, fx_west, t) + 0.5)
+                        @floatToInt(u32, u.lerp(fx_center, fx_west, line_t) + 0.5)
                     else
-                        @floatToInt(u32, u.lerp(fx_west, fx_center, t) + 0.5);
+                        @floatToInt(u32, u.lerp(fx_west, fx_center, line_t) + 0.5);
 
                     const x2 = if (cell.isUpright())
-                        @floatToInt(u32, u.lerp(fx_center, fx_east, t) + 0.5)
+                        @floatToInt(u32, u.lerp(fx_center, fx_east, line_t) + 0.5)
                     else
-                        @floatToInt(u32, u.lerp(fx_east, fx_center, t) + 0.5);
+                        @floatToInt(u32, u.lerp(fx_east, fx_center, line_t) + 0.5);
 
                     const y = std.math.min(xy.y_apex, xy.y_base) + line;
 
@@ -351,5 +352,5 @@ pub fn makeQoi(grid: TriGrid, walls: bool) ![]u8 {
         }
     }
 
-    return try qanv.encode();
+    return qanv;
 }

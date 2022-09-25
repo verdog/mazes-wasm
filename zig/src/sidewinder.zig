@@ -15,8 +15,7 @@ pub const Sidewinder = struct {
 
         var run_len: usize = 0;
 
-        var it = grid.cells();
-        while (it.next()) |cell| {
+        for (grid.cells_buf) |*cell| {
             var coin = random.intRangeAtMost(u1, 0, 1);
 
             run[run_len] = cell;

@@ -216,6 +216,7 @@ pub const UpsilonGrid = struct {
     pub fn deinit(self: *UpsilonGrid) void {
         self.alctr.free(self.cells_buf);
         self.alctr.destroy(self.prng);
+        if (self.distances) |*d| d.deinit();
     }
 
     fn prepareGrid(self: *UpsilonGrid) !void {
@@ -311,7 +312,7 @@ fn getCoords(cell: UpsilonCell, border_size: f64, cell_width: f64) struct {
     };
 }
 
-pub fn makeQoi(grid: UpsilonGrid, walls: bool) ![]u8 {
+pub fn makeQanvas(grid: UpsilonGrid, walls: bool, scale: usize) !qan.Qanvas {
     // the basic tile is this:
     //   ____
     //  /    \ _
@@ -320,13 +321,12 @@ pub fn makeQoi(grid: UpsilonGrid, walls: bool) ![]u8 {
     //
     // cell with is the width of the little sqaure
 
-    const cell_width: f64 = 16;
+    const cell_width = @intToFloat(f64, scale);
     const border_size: f64 = cell_width;
     const img_width = @floatToInt(u32, (cell_width * 2 * @intToFloat(f64, grid.width)) + (border_size * 3));
     const img_height = @floatToInt(u32, (cell_width * 2 * @intToFloat(f64, grid.height)) + (border_size * 3));
 
     var qanv = try qan.Qanvas.init(grid.alctr, img_width, img_height);
-    defer qanv.deinit();
 
     // colors
     const background_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } }; // black
@@ -420,5 +420,5 @@ pub fn makeQoi(grid: UpsilonGrid, walls: bool) ![]u8 {
         }
     }
 
-    return try qanv.encode();
+    return qanv;
 }

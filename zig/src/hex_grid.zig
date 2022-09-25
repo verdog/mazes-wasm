@@ -281,6 +281,7 @@ pub const HexGrid = struct {
     pub fn deinit(self: *HexGrid) void {
         self.alctr.free(self.cells_buf);
         self.alctr.destroy(self.prng);
+        if (self.distances) |*d| d.deinit();
     }
 
     fn prepareGrid(self: *HexGrid) !void {
@@ -326,8 +327,8 @@ pub const HexGrid = struct {
     }
 };
 
-pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
-    const cell_size = 12; // radius
+pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
+    const cell_size = @intCast(u32, scale); // radius
     const fcell_size = @intToFloat(f64, cell_size);
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
     const ib_size = @floatToInt(u32, b_size);
@@ -338,7 +339,6 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
     const height: u32 = (grid.height * 2 * ib_size) + ib_size + (2 * border_size) + 1;
 
     var qanv = try qan.Qanvas.init(grid.alctr, width, height);
-    defer qanv.deinit();
 
     // colors
     const background_color: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } }; // black
@@ -438,7 +438,7 @@ pub fn makeQoi(grid: HexGrid, walls: bool) ![]u8 {
         }
     }
 
-    return try qanv.encode();
+    return qanv;
 }
 
 pub fn makeString(grid: *HexGrid) ![]u8 {

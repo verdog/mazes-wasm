@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const qoi = @import("qoi.zig");
+const sdl2 = @import("sdl2"); // TODO remove; make independent encoder fns
 const Allocator = std.mem.Allocator;
 
 const Qixel = qoi.Qixel;
@@ -39,7 +40,7 @@ pub const Qanvas = struct {
         return q;
     }
 
-    pub fn deinit(this: Self) void {
+    pub fn deinit(this: *Self) void {
         this.allocator.free(this.buf);
     }
 
@@ -97,8 +98,21 @@ pub const Qanvas = struct {
         }
     }
 
-    pub fn encode(this: Self) ![]u8 {
+    pub fn encodeQoi(this: *Self) ![]u8 {
         return try qoi.encode(this.buf, this.allocator, this.width, this.height, qoi.Channels.rgba, qoi.Colorspace.alpha_linear);
+    }
+
+    pub fn encodeSdl(this: *Self, renderer: sdl2.Renderer) !sdl2.Texture {
+        var tex = try sdl2.createTexture(renderer, .abgr8888, .static, this.width, this.height);
+        errdefer tex.destroy();
+
+        try this.encodeSdlUpdate(&tex);
+
+        return tex;
+    }
+
+    pub fn encodeSdlUpdate(this: *Self, tex: *sdl2.Texture) !void {
+        try tex.update(@ptrCast(*[]u8, &this.buf).*, this.width * @sizeOf(Qixel(qoi.RGB)), null);
     }
 
     const Self = @This();

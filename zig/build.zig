@@ -1,4 +1,5 @@
 const std = @import("std");
+const SDLSdk = @import("external/SDL.zig/Sdk.zig");
 
 pub fn build(b: *std.build.Builder) void {
     // Standard target options allows the person running `zig build` to choose
@@ -11,8 +12,16 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
+    const SDL = SDLSdk.init(b);
+
     const exe = b.addExecutable("mazes", "src/main.zig");
+    exe.emit_docs = .emit;
     exe.setTarget(target);
+
+    SDL.link(exe, .dynamic);
+    exe.addPackage(SDL.getWrapperPackage("sdl2"));
+    exe.linkSystemLibrary("sdl2_image");
+
     exe.setBuildMode(mode);
     exe.install();
 
@@ -25,15 +34,9 @@ pub fn build(b: *std.build.Builder) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const test_locations = [_][]const u8{
-        "src/main.zig",
-    };
-
     const test_step = b.step("test", "Run unit tests");
-    for (test_locations) |loc| {
-        var ts = b.addTest(loc);
-        ts.setTarget(target);
-        ts.setBuildMode(mode);
-        test_step.dependOn(&ts.step);
-    }
+    var ts = b.addTest("src/main.zig");
+    ts.setTarget(target);
+    ts.setBuildMode(mode);
+    test_step.dependOn(&ts.step);
 }

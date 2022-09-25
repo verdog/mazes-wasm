@@ -339,29 +339,6 @@ pub const Grid = struct {
     alctr: Allocator,
     prng: *std.rand.DefaultPrng,
 
-    /// iterator over all cells in the grid
-    pub const CellI = struct {
-        i: u32 = 0,
-        parent: *Grid,
-
-        fn init(parent: *Grid) CellI {
-            return CellI{
-                .parent = parent,
-            };
-        }
-
-        pub fn next(self: *CellI) ?*Cell {
-            if (self.i < self.parent.size()) {
-                defer self.i += 1;
-                var x = @intCast(u32, self.i % self.parent.width);
-                var y = @intCast(u32, @divTrunc(self.i, self.parent.width));
-                return self.parent.at(x, y);
-            } else {
-                return null;
-            }
-        }
-    };
-
     pub fn init(alctr: Allocator, seed: u64, w: u32, h: u32) !Grid {
         var g = Grid{
             .width = w,
@@ -400,11 +377,6 @@ pub const Grid = struct {
     pub fn pickRandom(self: *Grid) *Cell {
         var i = self.prng.random().intRangeAtMost(usize, 0, self.size() - 1);
         return &self.cells_buf[i];
-    }
-
-    /// return an iterator over all cells in the grid
-    pub fn cells(self: *Grid) CellI {
-        return Grid.CellI.init(self);
     }
 
     /// return a list of every cell that is only connected to one other cell.
@@ -522,15 +494,14 @@ pub const Grid = struct {
     /// return a representation of the grid encoded as a qoi image.
     /// memory for the returned buffer is allocated by the allocator
     /// that the grid was initialized with.
-    pub fn makeQoi(self: Grid, walls: bool) ![]u8 {
-        const cell_size = 6;
+    pub fn makeQanvas(self: Grid, walls: bool, scale: usize) !qan.Qanvas {
+        const cell_size = @intCast(u32, scale);
         const border_size = cell_size / 2;
 
         const width = self.width * cell_size;
         const height = self.height * cell_size;
 
         var qanv = try qan.Qanvas.init(self.alctr, width + border_size * 2, height + border_size * 2);
-        defer qanv.deinit();
 
         // white
         // const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
@@ -581,7 +552,7 @@ pub const Grid = struct {
             }
         }
 
-        return qanv.encode();
+        return qanv;
     }
 };
 
@@ -697,40 +668,6 @@ test "Grid.at(...) out of bounds returns null" {
     try expectEq(null, g.at(4, 4));
     try expectEq(null, g.at(0, 4));
     try expectEq(null, g.at(4, 0));
-}
-
-test "Grid.cells(...) returns an iterator" {
-    var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 0, 4, 4);
-    defer g.deinit();
-
-    {
-        var count: usize = 0;
-        var it = g.cells();
-        while (it.next()) |cell| {
-            _ = cell;
-            count += 1;
-        }
-
-        try expectEq(@as(@TypeOf(count), 16), count);
-    }
-}
-
-test "Grid.cells(...) iterates over each cell exactly once" {
-    var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 0, 32, 32);
-    defer g.deinit();
-
-    {
-        var seen = std.AutoHashMap(*Cell, void).init(alloc);
-        defer seen.deinit();
-
-        var it = g.cells();
-        while (it.next()) |cell| {
-            try expect(seen.contains(cell) == false);
-            try seen.put(cell, {});
-        }
-    }
 }
 
 test "Grid.makeString() returns a perfect, closed grid before modification" {

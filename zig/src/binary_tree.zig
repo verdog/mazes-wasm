@@ -12,10 +12,9 @@ const expectEq = std.testing.expectEqual;
 pub const BinaryTree = struct {
     /// apply the binary tree maze algorithm to `grid` using random `seed`.
     pub fn on(grid: *Grid) !void {
-        var it = grid.cells();
         const random = grid.prng.random();
 
-        while (it.next()) |cell| {
+        for (grid.cells_buf) |*cell| {
             // Of the cell's north and east neighbors, if it has them at all,
             // pick a random cell from the two and link it.
             var candidates: [2]?*Cell = .{ cell.north, cell.east };

@@ -1,9 +1,16 @@
 const std = @import("std");
+const btin = @import("builtin");
+const sdl2 = @import("sdl2");
 
 const maze = @import("mazes.zig");
+const qan = @import("qanvas.zig");
 const u = @import("u.zig");
 
-var heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+var heap = switch (btin.mode) {
+    std.builtin.Mode.Debug => std.heap.GeneralPurposeAllocator(.{}){},
+    std.builtin.Mode.ReleaseSafe => std.heap.GeneralPurposeAllocator(.{}){},
+    else => std.heap.ArenaAllocator.init(std.heap.page_allocator),
+};
 var alloc = heap.allocator();
 const stdout = std.io.getStdOut().writer();
 
@@ -14,6 +21,7 @@ const Options = struct {
     seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
+    scale: usize = 8,
     @"type": [64]u8 = u.strBuf(64, "RecursiveBacktracker"),
     viz: Vizualization = .heat,
     grid: Grid = .square,
@@ -30,103 +38,70 @@ const Options = struct {
         upsilon,
     };
 
-    pub fn withRandomSeed() Options {
-        return .{
-            .seed = @byteSwap(@truncate(u64, @bitCast(u128, std.time.nanoTimestamp()))),
-        };
-    }
-};
+    pub fn parse(opts: *Options, argv: anytype) !void {
+        for (argv) |sarg| {
+            const eq = std.mem.eql;
+            const arg = std.mem.span(sarg);
 
-fn printOptions(opt: Options) void {
-    std.debug.print("With options:\n", .{});
-    std.debug.print(
-        \\ - text: {}
-        \\ - qoi: {}
-        \\ - qoi_walls: {}
-        \\ - seed: {d}
-        \\ - width: {d}
-        \\ - height: {d}
-        \\ - type: {s}
-        \\ - viz: {s}
-        \\ - grid: {s}
-        \\
-    , .{
-        opt.text,
-        opt.qoi,
-        opt.qoi_walls,
-        opt.seed,
-        opt.width,
-        opt.height,
-        std.mem.sliceTo(&opt.@"type", 0),
-        u.eString(Options.Vizualization, opt.viz),
-        u.eString(Options.Grid, opt.grid),
-    });
-}
+            // flags
+            if (eq(u8, "--text", arg)) {
+                opts.text = true;
+            } else if (eq(u8, "--notext", arg)) {
+                opts.text = false;
+            } else if (eq(u8, "--qoi", arg)) {
+                opts.qoi = true;
+            } else if (eq(u8, "--noqoi", arg)) {
+                opts.qoi = false;
+            } else if (eq(u8, "--qoi-walls", arg)) {
+                opts.qoi_walls = true;
+            } else if (eq(u8, "--noqoi-walls", arg)) {
+                opts.qoi_walls = false;
+            } else {
+                // values
+                var it = std.mem.split(u8, arg, "=");
 
-pub fn main() !void {
-    // defer _ = heap.detectLeaks();
-    defer heap.deinit();
-
-    // parse args
-    var opts = Options.withRandomSeed();
-    for (std.os.argv) |sarg| {
-        const eq = std.mem.eql;
-        const arg = std.mem.span(sarg);
-
-        // flags
-        if (eq(u8, "--text", arg)) {
-            opts.text = true;
-        } else if (eq(u8, "--notext", arg)) {
-            opts.text = false;
-        } else if (eq(u8, "--qoi", arg)) {
-            opts.qoi = true;
-        } else if (eq(u8, "--noqoi", arg)) {
-            opts.qoi = false;
-        } else if (eq(u8, "--qoi-walls", arg)) {
-            opts.qoi_walls = true;
-        } else if (eq(u8, "--noqoi-walls", arg)) {
-            opts.qoi_walls = false;
-        } else {
-            // values
-            var it = std.mem.split(u8, arg, "=");
-
-            if (it.next()) |left| {
-                if (eq(u8, "--seed", left)) {
-                    if (it.next()) |right| {
-                        opts.seed = try std.fmt.parseUnsigned(@TypeOf(opts.seed), right, 10);
-                    }
-                } else if (eq(u8, "--width", left)) {
-                    if (it.next()) |right| {
-                        opts.width = try std.fmt.parseUnsigned(@TypeOf(opts.width), right, 10);
-                    }
-                } else if (eq(u8, "--height", left)) {
-                    if (it.next()) |right| {
-                        opts.height = try std.fmt.parseUnsigned(@TypeOf(opts.height), right, 10);
-                    }
-                } else if (eq(u8, "--type", left)) {
-                    if (it.next()) |right| {
-                        if (eq(u8, "None", right)) {
-                            std.mem.copy(u8, &opts.@"type", right);
-                            opts.@"type"[right.len] = 0;
-                        } else {
-                            for (@typeInfo(maze).Struct.decls) |dec| {
-                                if (eq(u8, dec.name, right)) {
-                                    std.mem.copy(u8, &opts.@"type", right);
-                                    opts.@"type"[right.len] = 0;
+                if (it.next()) |left| {
+                    if (eq(u8, "--seed", left)) {
+                        if (it.next()) |right| {
+                            opts.seed = try std.fmt.parseUnsigned(@TypeOf(opts.seed), right, 10);
+                        }
+                    } else if (eq(u8, "--width", left)) {
+                        if (it.next()) |right| {
+                            opts.width = try std.fmt.parseUnsigned(@TypeOf(opts.width), right, 10);
+                        }
+                    } else if (eq(u8, "--height", left)) {
+                        if (it.next()) |right| {
+                            opts.height = try std.fmt.parseUnsigned(@TypeOf(opts.height), right, 10);
+                        }
+                    } else if (eq(u8, "--scale", left)) {
+                        if (it.next()) |right| {
+                            opts.scale = try std.fmt.parseUnsigned(@TypeOf(opts.scale), right, 10);
+                        }
+                    } else if (eq(u8, "--type", left)) {
+                        if (it.next()) |right| {
+                            if (eq(u8, "None", right)) {
+                                std.mem.copy(u8, &opts.@"type", right);
+                                opts.@"type"[right.len] = 0;
+                            } else {
+                                for (@typeInfo(maze).Struct.decls) |dec| {
+                                    if (eq(u8, dec.name, right)) {
+                                        std.mem.copy(u8, &opts.@"type", right);
+                                        opts.@"type"[right.len] = 0;
+                                    }
                                 }
                             }
                         }
-                    }
-                } else if (eq(u8, "--viz", left)) {
-                    if (it.next()) |right| {
-                        if (std.meta.stringToEnum(Options.Vizualization, right)) |e| {
-                            opts.viz = e;
+                    } else if (eq(u8, "--viz", left)) {
+                        if (it.next()) |right| {
+                            if (std.meta.stringToEnum(Options.Vizualization, right)) |e| {
+                                opts.viz = e;
+                            }
                         }
-                    }
-                } else if (eq(u8, "--grid", left)) {
-                    if (it.next()) |right| {
-                        if (std.meta.stringToEnum(Options.Grid, right)) |e| {
-                            opts.grid = e;
+                    } else if (eq(u8, "--grid", left)) {
+                        if (it.next()) |right| {
+                            if (std.meta.stringToEnum(Options.Grid, right)) |e| {
+                                opts.grid = e;
+                            }
                         }
                     }
                 }
@@ -134,10 +109,112 @@ pub fn main() !void {
         }
     }
 
-    try dispatch(opts);
+    pub fn newSeed(this: *Options) void {
+        this.seed = @byteSwap(@truncate(u64, @bitCast(u128, std.time.nanoTimestamp())));
+    }
+
+    pub fn print(opt: Options) void {
+        std.debug.print("With options:\n", .{});
+        std.debug.print(
+            \\ - text: {}
+            \\ - qoi: {}
+            \\ - qoi_walls: {}
+            \\ - seed: {d}
+            \\ - width: {d}
+            \\ - height: {d}
+            \\ - scale: {d}
+            \\ - type: {s}
+            \\ - viz: {s}
+            \\ - grid: {s}
+            \\
+        , .{
+            opt.text,
+            opt.qoi,
+            opt.qoi_walls,
+            opt.seed,
+            opt.width,
+            opt.height,
+            opt.scale,
+            std.mem.sliceTo(&opt.@"type", 0),
+            u.eString(Options.Vizualization, opt.viz),
+            u.eString(Options.Grid, opt.grid),
+        });
+    }
+};
+
+pub fn main() !void {
+    // clean up heap
+    defer {
+        if (@TypeOf(heap) == std.heap.GeneralPurposeAllocator(.{}))
+            _ = heap.detectLeaks();
+        if (@TypeOf(heap) == std.heap.ArenaAllocator)
+            heap.deinit();
+    }
+
+    // parse args
+    var opts = Options{};
+    opts.newSeed();
+    try opts.parse(std.os.argv);
+
+    // generate maze bytes
+    var maze_qan = try dispatch(opts);
+    defer maze_qan.deinit();
+
+    try sdl2.init(.{
+        .video = true,
+        .events = true,
+    });
+    defer sdl2.quit();
+    try sdl2.image.init(.{ .png = true });
+    defer sdl2.image.quit();
+
+    // create window
+    var sdl_window = try sdl2.createWindow(
+        "Mazes",
+        .{ .centered = {} },
+        .{ .centered = {} },
+        maze_qan.width,
+        maze_qan.height,
+        .{ .vis = .shown },
+    );
+    defer sdl_window.destroy();
+
+    var sdl_renderer = try sdl2.createRenderer(sdl_window, null, .{ .accelerated = true });
+    defer sdl_renderer.destroy();
+
+    var sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
+    defer sdl_tex.destroy();
+
+    main_loop: while (true) {
+        while (sdl2.pollEvent()) |ev| {
+            switch (ev) {
+                .quit => break :main_loop,
+                .mouse_button_up => |mouse| {
+                    if (mouse.button == .left) {
+                        opts.newSeed();
+                        maze_qan.deinit();
+                        maze_qan = try dispatch(opts);
+                        try maze_qan.encodeSdlUpdate(&sdl_tex);
+                    }
+                },
+                .key_up => |key| {
+                    // TODO parse commands to change the settings
+                    _ = key;
+                    try stdout.print("TODO\n", .{});
+                },
+                else => {},
+            }
+        }
+
+        try sdl_renderer.copy(sdl_tex, null, null);
+
+        sdl_renderer.present();
+
+        sdl2.delay(7); // ~144hz
+    }
 }
 
-fn dispatch(opt: Options) !void {
+fn dispatch(opt: Options) !qan.Qanvas {
     switch (opt.grid) {
         .square => return try run_square(maze.Grid, opt),
         .hex => return try run_hex(maze.HexGrid, opt),
@@ -147,8 +224,8 @@ fn dispatch(opt: Options) !void {
 }
 
 // TODO unify run_ fns
-fn run_square(comptime Grid: type, opt: Options) !void {
-    printOptions(opt);
+fn run_square(comptime Grid: type, opt: Options) !qan.Qanvas {
+    opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
@@ -164,7 +241,7 @@ fn run_square(comptime Grid: type, opt: Options) !void {
     }
 
     std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(maze.Cell).from(grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?);
+    grid.distances = try maze.Distances(maze.Cell).from(grid.pickRandom());
     std.debug.print("Done\n", .{});
 
     if (opt.viz == .path) {
@@ -184,16 +261,6 @@ fn run_square(comptime Grid: type, opt: Options) !void {
         std.debug.print("Done\n", .{});
     }
 
-    if (opt.qoi) {
-        std.debug.print("Encoding image... ", .{});
-
-        var encoded = try grid.makeQoi(opt.qoi_walls);
-        defer alloc.free(encoded);
-        try stdout.print("{s}", .{encoded});
-
-        std.debug.print("Done\n", .{});
-    }
-
     std.debug.print("Stats:\n", .{});
     {
         var deadends = try grid.deadends();
@@ -204,10 +271,17 @@ fn run_square(comptime Grid: type, opt: Options) !void {
         var max = dists.max();
         std.debug.print("- {} longest path\n", .{max.distance});
     }
+
+    std.debug.print("Encoding image... ", .{});
+
+    var qanv = try grid.makeQanvas(opt.qoi_walls, opt.scale);
+
+    std.debug.print("Done\n", .{});
+    return qanv;
 }
 
-fn run_hex(comptime Grid: type, opt: Options) !void {
-    printOptions(opt);
+fn run_hex(comptime Grid: type, opt: Options) !qan.Qanvas {
+    opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
@@ -243,16 +317,6 @@ fn run_hex(comptime Grid: type, opt: Options) !void {
     //     std.debug.print("Done\n", .{});
     // }
 
-    if (opt.qoi) {
-        std.debug.print("Encoding image... ", .{});
-
-        var encoded = try maze.makeQoi(grid, opt.qoi_walls);
-        defer alloc.free(encoded);
-        try stdout.print("{s}", .{encoded});
-
-        std.debug.print("Done\n", .{});
-    }
-
     // std.debug.print("Stats:\n", .{});
     // {
     //     var deadends = try grid.deadends();
@@ -263,10 +327,17 @@ fn run_hex(comptime Grid: type, opt: Options) !void {
     //     var max = dists.max();
     //     std.debug.print("- {} longest path\n", .{max.distance});
     // }
+
+    std.debug.print("Encoding image... ", .{});
+
+    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
+
+    std.debug.print("Done\n", .{});
+    return qanv;
 }
 
-fn run_tri(comptime Grid: type, opt: Options) !void {
-    printOptions(opt);
+fn run_tri(comptime Grid: type, opt: Options) !qan.Qanvas {
+    opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
@@ -302,16 +373,6 @@ fn run_tri(comptime Grid: type, opt: Options) !void {
     //     std.debug.print("Done\n", .{});
     // }
 
-    if (opt.qoi) {
-        std.debug.print("Encoding image... ", .{});
-
-        var encoded = try maze.makeQoi(grid, opt.qoi_walls);
-        defer alloc.free(encoded);
-        try stdout.print("{s}", .{encoded});
-
-        std.debug.print("Done\n", .{});
-    }
-
     // std.debug.print("Stats:\n", .{});
     // {
     //     var deadends = try grid.deadends();
@@ -322,10 +383,17 @@ fn run_tri(comptime Grid: type, opt: Options) !void {
     //     var max = dists.max();
     //     std.debug.print("- {} longest path\n", .{max.distance});
     // }
+
+    std.debug.print("Encoding image... ", .{});
+
+    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
+
+    std.debug.print("Done\n", .{});
+    return qanv;
 }
 
-fn run_upsilon(comptime Grid: type, opt: Options) !void {
-    printOptions(opt);
+fn run_upsilon(comptime Grid: type, opt: Options) !qan.Qanvas {
+    opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
@@ -361,16 +429,6 @@ fn run_upsilon(comptime Grid: type, opt: Options) !void {
     //     std.debug.print("Done\n", .{});
     // }
 
-    if (opt.qoi) {
-        std.debug.print("Encoding image... ", .{});
-
-        var encoded = try maze.makeQoi(grid, opt.qoi_walls);
-        defer alloc.free(encoded);
-        try stdout.print("{s}", .{encoded});
-
-        std.debug.print("Done\n", .{});
-    }
-
     // std.debug.print("Stats:\n", .{});
     // {
     //     var deadends = try grid.deadends();
@@ -381,6 +439,14 @@ fn run_upsilon(comptime Grid: type, opt: Options) !void {
     //     var max = dists.max();
     //     std.debug.print("- {} longest path\n", .{max.distance});
     // }
+
+    std.debug.print("Encoding image... ", .{});
+
+    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
+
+    std.debug.print("Done\n", .{});
+
+    return qanv;
 }
 
 test "Run all tests" {

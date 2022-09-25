@@ -17,6 +17,8 @@ pub const Fast = @import("fast.zig").Fast;
 pub const HuntAndKill = @import("hunt_and_kill.zig").HuntAndKill;
 pub const RecursiveBacktracker = @import("recursive_backtracker.zig").RecursiveBacktracker;
 
+pub const Qanvas = @import("qanvas.zig").Qanvas;
+
 const Error = error{
     NoSuchMaze,
 };
@@ -60,12 +62,12 @@ pub fn makeString(comptime GridT: type, grid: *GridT) ![]u8 {
     }
 }
 
-pub fn makeQoi(grid: anytype, walls: bool) ![]u8 {
+pub fn makeQanvas(grid: anytype, walls: bool, scale: usize) !Qanvas {
     switch (@TypeOf(grid)) {
-        Grid => return try grid.makeQoi(walls),
-        HexGrid => return try @import("hex_grid.zig").makeQoi(grid, walls),
-        TriGrid => return try @import("tri_grid.zig").makeQoi(grid, walls),
-        UpsilonGrid => return try @import("upsilon_grid.zig").makeQoi(grid, walls),
+        Grid => return try grid.makeQanvas(walls, scale),
+        HexGrid => return try @import("hex_grid.zig").makeQanvas(grid, walls, scale),
+        TriGrid => return try @import("tri_grid.zig").makeQanvas(grid, walls, scale),
+        UpsilonGrid => return try @import("upsilon_grid.zig").makeQanvas(grid, walls, scale),
         else => return Error.NoSuchMaze,
     }
 }
