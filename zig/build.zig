@@ -17,6 +17,7 @@ pub fn build(b: *std.build.Builder) void {
     const exe = b.addExecutable("mazes", "src/main.zig");
     exe.emit_docs = .emit;
     exe.setTarget(target);
+    exe.setMainPkgPath("./src");
 
     SDL.link(exe, .dynamic);
     exe.addPackage(SDL.getWrapperPackage("sdl2"));

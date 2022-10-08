@@ -6,18 +6,13 @@ const maze = @import("mazes.zig");
 const qan = @import("qanvas.zig");
 const u = @import("u.zig");
 
-var heap = switch (btin.mode) {
-    std.builtin.Mode.Debug => std.heap.GeneralPurposeAllocator(.{}){},
-    std.builtin.Mode.ReleaseSafe => std.heap.GeneralPurposeAllocator(.{}){},
-    else => std.heap.ArenaAllocator.init(std.heap.page_allocator),
-};
-var alloc = heap.allocator();
 const stdout = std.io.getStdOut().writer();
 
 const Options = struct {
     text: bool = true,
     qoi: bool = false,
     qoi_walls: bool = true,
+    braid: f64 = 0,
     seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
@@ -77,6 +72,10 @@ const Options = struct {
                         if (it.next()) |right| {
                             opts.scale = try std.fmt.parseUnsigned(@TypeOf(opts.scale), right, 10);
                         }
+                    } else if (eq(u8, "--braid", left)) {
+                        if (it.next()) |right| {
+                            opts.braid = try std.fmt.parseFloat(@TypeOf(opts.braid), right);
+                        }
                     } else if (eq(u8, "--type", left)) {
                         if (it.next()) |right| {
                             if (eq(u8, "None", right)) {
@@ -119,6 +118,7 @@ const Options = struct {
             \\ - text: {}
             \\ - qoi: {}
             \\ - qoi_walls: {}
+            \\ - braid: {d}
             \\ - seed: {d}
             \\ - width: {d}
             \\ - height: {d}
@@ -131,6 +131,7 @@ const Options = struct {
             opt.text,
             opt.qoi,
             opt.qoi_walls,
+            opt.braid,
             opt.seed,
             opt.width,
             opt.height,
@@ -143,21 +144,16 @@ const Options = struct {
 };
 
 pub fn main() !void {
-    // clean up heap
-    defer {
-        if (@TypeOf(heap) == std.heap.GeneralPurposeAllocator(.{}))
-            _ = heap.detectLeaks();
-        if (@TypeOf(heap) == std.heap.ArenaAllocator)
-            heap.deinit();
-    }
-
     // parse args
     var opts = Options{};
     opts.newSeed();
     try opts.parse(std.os.argv);
 
+    var heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer heap.deinit();
+
     // generate maze bytes
-    var maze_qan = try dispatch(opts);
+    var maze_qan = try dispatch(opts, heap.allocator());
     defer maze_qan.deinit();
 
     try sdl2.init(.{
@@ -191,9 +187,11 @@ pub fn main() !void {
                 .quit => break :main_loop,
                 .mouse_button_up => |mouse| {
                     if (mouse.button == .left) {
-                        opts.newSeed();
                         maze_qan.deinit();
-                        maze_qan = try dispatch(opts);
+                        heap.deinit();
+                        heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+                        opts.newSeed();
+                        maze_qan = try dispatch(opts, heap.allocator());
                         try maze_qan.encodeSdlUpdate(&sdl_tex);
                     }
                 },
@@ -214,17 +212,17 @@ pub fn main() !void {
     }
 }
 
-fn dispatch(opt: Options) !qan.Qanvas {
+fn dispatch(opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     switch (opt.grid) {
-        .square => return try run_square(maze.Grid, opt),
-        .hex => return try run_hex(maze.HexGrid, opt),
-        .tri => return try run_tri(maze.TriGrid, opt),
-        .upsilon => return try run_upsilon(maze.UpsilonGrid, opt),
+        .square => return try run_square(maze.Grid, opt, alloc),
+        .hex => return try run_hex(maze.HexGrid, opt, alloc),
+        .tri => return try run_tri(maze.TriGrid, opt, alloc),
+        .upsilon => return try run_upsilon(maze.UpsilonGrid, opt, alloc),
     }
 }
 
 // TODO unify run_ fns
-fn run_square(comptime Grid: type, opt: Options) !qan.Qanvas {
+fn run_square(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
@@ -233,6 +231,11 @@ fn run_square(comptime Grid: type, opt: Options) !qan.Qanvas {
     std.debug.print("Generating... ", .{});
     try maze.onByName(Grid, &opt.@"type", &grid);
     std.debug.print("Done\n", .{});
+
+    if (opt.braid > 0) {
+        std.debug.print("Braiding...\n", .{});
+        try grid.braid(opt.braid);
+    }
 
     if (opt.text) {
         var txt = try maze.makeString(Grid, &grid);
@@ -280,7 +283,7 @@ fn run_square(comptime Grid: type, opt: Options) !qan.Qanvas {
     return qanv;
 }
 
-fn run_hex(comptime Grid: type, opt: Options) !qan.Qanvas {
+fn run_hex(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
@@ -336,7 +339,7 @@ fn run_hex(comptime Grid: type, opt: Options) !qan.Qanvas {
     return qanv;
 }
 
-fn run_tri(comptime Grid: type, opt: Options) !qan.Qanvas {
+fn run_tri(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
@@ -392,7 +395,7 @@ fn run_tri(comptime Grid: type, opt: Options) !qan.Qanvas {
     return qanv;
 }
 
-fn run_upsilon(comptime Grid: type, opt: Options) !qan.Qanvas {
+fn run_upsilon(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);

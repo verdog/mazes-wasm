@@ -202,6 +202,7 @@ pub const Cell = struct {
 
     row: u32 = 0,
     col: u32 = 0,
+    weight: u32 = 1,
 
     alctr: Allocator,
     prng: *std.rand.DefaultPrng,
@@ -394,6 +395,51 @@ pub const Grid = struct {
         return list.toOwnedSlice();
     }
 
+    /// remove dead ends. p is a number betweein 0.0 and 1.0 and is the
+    /// probability that a dead end will be removed.
+    pub fn braid(self: *Grid, p: f64) !void {
+        var ddends = try self.deadends();
+        defer self.alctr.free(ddends);
+
+        self.prng.random().shuffle(*Cell, ddends);
+
+        for (ddends) |cell| {
+            const pick = self.prng.random().float(f64);
+            if (pick > p or cell.numLinks() != 1) continue;
+
+            // filter out already linked
+            var unlinked_buf = [_]?*Cell{null} ** 4;
+            var ulen: usize = 0;
+            {
+                var neii = cell.neighbors();
+                while (neii.next()) |nei| {
+                    if (!cell.isLinked(nei)) {
+                        unlinked_buf[ulen] = nei;
+                        ulen += 1;
+                    }
+                }
+            }
+            var unlinked = unlinked_buf[0..ulen];
+
+            // prefer linked two dead ends together. it looks nice
+            var best_buf = [_]?*Cell{null} ** 4;
+            var blen: usize = 0;
+            for (unlinked) |unei| {
+                if (unei.?.numLinks() == 1) {
+                    best_buf[blen] = unei;
+                    blen += 1;
+                }
+            }
+            var best = best_buf[0..blen];
+
+            var pool: *[]?*Cell = if (best.len > 0) &best else &unlinked;
+
+            var choice_i = self.prng.random().intRangeLessThan(usize, 0, pool.len);
+            var choice = pool.*[choice_i];
+            try cell.bLink(choice.?);
+        }
+    }
+
     /// return the amount of cells in the grid
     pub fn size(self: Grid) usize {
         return self.width *| self.height;
@@ -536,7 +582,7 @@ pub const Grid = struct {
             // const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
 
             // white
-            const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 45, .green = 40, .blue = 40 } };
+            const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 15, .green = 10, .blue = 10 } };
 
             for (self.cells_buf) |*cell| {
                 const x1 = cell.col * cell_size + border_size;
@@ -658,6 +704,13 @@ test "Construct and destruct a Grid" {
     var g = try Grid.init(alloc, 0, 4, 4);
     defer g.deinit();
     try expectEq(@as(@TypeOf(g.size()), 16), g.size());
+}
+
+test "Construct and destruct a big Grid" {
+    var alloc = std.testing.allocator;
+    var g = try Grid.init(alloc, 0, 1024, 1024);
+    defer g.deinit();
+    try expectEq(@as(@TypeOf(g.size()), 1024 * 1024), g.size());
 }
 
 test "Grid.at(...) out of bounds returns null" {
