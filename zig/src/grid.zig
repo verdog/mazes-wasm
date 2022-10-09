@@ -232,42 +232,43 @@ pub fn Distances(comptime CellT: type) type {
 
         pub fn from(cell: *CellT) !Distances(CellT) {
             var dists = Distances(CellT).init(cell.alctr, cell);
-            try dists.dists.put(cell, 0);
+            try dists.dists.put(cell, cell.weight);
 
-            var frontier1 = std.ArrayList(@TypeOf(cell)).init(cell.alctr);
-            defer frontier1.deinit();
-            var frontier2 = std.ArrayList(@TypeOf(cell)).init(cell.alctr);
-            defer frontier2.deinit();
+            const comp = struct {
+                fn f(_: void, a: *CellT, b: *CellT) std.math.Order {
+                    if (a.weight < b.weight) return .lt;
+                    if (a.weight == b.weight) return .eq;
+                    if (a.weight > b.weight) return .gt;
+                    unreachable;
+                }
+            }.f;
 
-            var current_frontier = &frontier1;
-            var next_frontier = &frontier2;
+            var frontier = std.PriorityQueue(*CellT, void, comp).init(dists.alloc, {});
+            defer frontier.deinit();
 
-            try current_frontier.append(cell);
+            try frontier.add(cell);
 
-            while (current_frontier.items.len > 0) {
-                next_frontier.clearRetainingCapacity();
-
-                for (current_frontier.items) |cellptr| {
-                    // TODO unify this
-                    if (CellT == Cell) {
-                        var itr = cellptr.links();
-                        while (itr.next()) |linked| {
-                            if (dists.get(linked.*)) |_| continue;
-                            try dists.put(linked.*, dists.get(cellptr).? + 1);
-                            try next_frontier.append(linked.*);
+            while (frontier.count() > 0) {
+                var cellptr = frontier.remove();
+                // TODO unify this
+                if (CellT == Cell) {
+                    var itr = cellptr.links();
+                    while (itr.next()) |c| {
+                        const total_weight = dists.get(cellptr).? + c.*.*.weight;
+                        if (dists.get(c.*) == null or total_weight < dists.get(c.*).?) {
+                            try frontier.add(c.*);
+                            try dists.put(c.*, total_weight);
                         }
-                    } else {
-                        const links = cellptr.links();
-                        var i: usize = 0;
-                        while (i < links.len and links[i] != null) : (i += 1) {
-                            if (dists.get(links[i].?)) |_| continue;
-                            try dists.put(links[i].?, dists.get(cellptr).? + 1);
-                            try next_frontier.append(links[i].?);
+                    }
+                } else {
+                    for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
+                        const total_weight = dists.get(cellptr).? + c.?.weight;
+                        if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
+                            try frontier.add(c.?);
+                            try dists.put(c.?, total_weight);
                         }
                     }
                 }
-
-                std.mem.swap(*std.ArrayList(*CellT), &current_frontier, &next_frontier);
             }
 
             return dists;
@@ -475,7 +476,7 @@ pub const Grid = struct {
         const contents = "0123456789ABCDEF";
         if (self.distances) |distances| {
             if (distances.get(cell)) |dist| {
-                return contents[dist % contents.len];
+                return contents[(dist - 1) % contents.len];
             }
         }
         return ' ';

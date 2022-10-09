@@ -186,6 +186,7 @@ pub const UpsilonCell = struct {
     prng: *std.rand.DefaultPrng,
     x: u32,
     y: u32,
+    weight: u32 = 1,
 };
 
 pub const UpsilonGrid = struct {
