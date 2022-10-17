@@ -214,15 +214,14 @@ pub fn main() !void {
 
 fn dispatch(opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     switch (opt.grid) {
-        .square => return try run_square(maze.Grid, opt, alloc),
-        .hex => return try run_hex(maze.HexGrid, opt, alloc),
-        .tri => return try run_tri(maze.TriGrid, opt, alloc),
-        .upsilon => return try run_upsilon(maze.UpsilonGrid, opt, alloc),
+        .square => return try run(maze.Grid, opt, alloc),
+        .hex => return try run(maze.HexGrid, opt, alloc),
+        .tri => return try run(maze.TriGrid, opt, alloc),
+        .upsilon => return try run(maze.UpsilonGrid, opt, alloc),
     }
 }
 
-// TODO unify run_ fns
-fn run_square(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
+fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     opt.print();
 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
@@ -232,44 +231,52 @@ fn run_square(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.
     try maze.onByName(Grid, &opt.@"type", &grid);
     std.debug.print("Done\n", .{});
 
-    if (opt.braid > 0) {
-        std.debug.print("Braiding...\n", .{});
-        try grid.braid(opt.braid);
-    }
+    comptime if (maze.gridSupports(Grid, "braid"))
+        if (opt.braid > 0) {
+            std.debug.print("Braiding...\n", .{});
+            try grid.braid(opt.braid);
+        };
 
     if (opt.text) {
-        var txt = try maze.makeString(Grid, &grid);
-        defer alloc.free(txt);
-        std.debug.print("{s}\n", .{txt});
+        if (maze.makeString(Grid, &grid)) |txt| {
+            defer alloc.free(txt);
+            std.debug.print("{s}\n", .{txt});
+        } else |err| switch (err) {
+            maze.Error.NoSuchMaze => std.debug.print("ASCII maze not supported ({})\n", .{err}),
+            else => unreachable,
+        }
     }
 
     std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(maze.Cell).from(grid.pickRandom());
+    grid.distances = try maze.Distances(Grid.CellT).from(grid.pickRandom());
     std.debug.print("Done\n", .{});
 
-    if (opt.viz == .path) {
-        std.debug.print("Finding longest path...", .{});
+    if (Grid == maze.Grid)
+        if (opt.viz == .path) {
+            std.debug.print("Finding longest path...", .{});
 
-        // modify distances to be longest path in maze
-        var a = grid.distances.?.max().cell;
-        var a_dists = try maze.Distances(maze.Cell).from(a);
-        defer a_dists.deinit();
+            // modify distances to be longest path in maze
+            var a = grid.distances.?.max().cell;
+            var a_dists = try maze.Distances(Grid.CellT).from(a);
+            defer a_dists.deinit();
 
-        var b = a_dists.max().cell;
-        var a_long = try a_dists.pathTo(b);
+            var b = a_dists.max().cell;
+            var a_long = try a_dists.pathTo(b);
 
-        grid.distances.?.deinit();
-        grid.distances = a_long;
+            grid.distances.?.deinit();
+            grid.distances = a_long;
 
-        std.debug.print("Done\n", .{});
-    }
+            std.debug.print("Done\n", .{});
+        };
 
     std.debug.print("Stats:\n", .{});
-    {
+
+    comptime if (maze.gridSupports(Grid, "deadends")) {
         var deadends = try grid.deadends();
         defer grid.alctr.free(deadends);
         std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
-    }
+    };
+
     if (grid.distances) |dists| {
         var max = dists.max();
         std.debug.print("- {} longest path\n", .{max.distance});
@@ -277,178 +284,9 @@ fn run_square(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.
 
     std.debug.print("Encoding image... ", .{});
 
-    var qanv = try grid.makeQanvas(opt.qoi_walls, opt.scale);
-
-    std.debug.print("Done\n", .{});
-    return qanv;
-}
-
-fn run_hex(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
-    opt.print();
-
-    var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
-    defer grid.deinit();
-
-    std.debug.print("Generating... ", .{});
-    try maze.onByName(Grid, &opt.@"type", &grid);
-    std.debug.print("Done\n", .{});
-
-    std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(maze.HexCell).from(grid.at(@divTrunc(grid.width, 2), @divTrunc(grid.height, 2)).?);
-    std.debug.print("Done\n", .{});
-
-    if (opt.text) {
-        var txt = try maze.makeString(Grid, &grid);
-        defer alloc.free(txt);
-        std.debug.print("{s}\n", .{txt});
-    }
-
-    // if (opt.viz == .path) {
-    //     std.debug.print("Finding longest path...", .{});
-
-    //     // modify distances to be longest path in maze
-    //     var a = grid.distances.?.max().cell;
-    //     var a_dists = try a.distances();
-    //     defer a_dists.deinit();
-
-    //     var b = a_dists.max().cell;
-    //     var a_long = try a_dists.pathTo(b);
-
-    //     grid.distances.?.deinit();
-    //     grid.distances = a_long;
-
-    //     std.debug.print("Done\n", .{});
-    // }
-
-    // std.debug.print("Stats:\n", .{});
-    // {
-    //     var deadends = try grid.deadends();
-    //     defer grid.mem.free(deadends);
-    //     std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
-    // }
-    // if (grid.distances) |dists| {
-    //     var max = dists.max();
-    //     std.debug.print("- {} longest path\n", .{max.distance});
-    // }
-
-    std.debug.print("Encoding image... ", .{});
-
     var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
 
     std.debug.print("Done\n", .{});
-    return qanv;
-}
-
-fn run_tri(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
-    opt.print();
-
-    var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
-    defer grid.deinit();
-
-    std.debug.print("Generating... ", .{});
-    try maze.onByName(Grid, &opt.@"type", &grid);
-    std.debug.print("Done\n", .{});
-
-    std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(maze.TriCell).from(grid.pickRandom());
-    std.debug.print("Done\n", .{});
-
-    // if (opt.text) {
-    //     var txt = try hgrd.makeString(&grid);
-    //     defer alloc.free(txt);
-    //     std.debug.print("{s}\n", .{txt});
-    // }
-
-    // if (opt.viz == .path) {
-    //     std.debug.print("Finding longest path...", .{});
-
-    //     // modify distances to be longest path in maze
-    //     var a = grid.distances.?.max().cell;
-    //     var a_dists = try a.distances();
-    //     defer a_dists.deinit();
-
-    //     var b = a_dists.max().cell;
-    //     var a_long = try a_dists.pathTo(b);
-
-    //     grid.distances.?.deinit();
-    //     grid.distances = a_long;
-
-    //     std.debug.print("Done\n", .{});
-    // }
-
-    // std.debug.print("Stats:\n", .{});
-    // {
-    //     var deadends = try grid.deadends();
-    //     defer grid.mem.free(deadends);
-    //     std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
-    // }
-    // if (grid.distances) |dists| {
-    //     var max = dists.max();
-    //     std.debug.print("- {} longest path\n", .{max.distance});
-    // }
-
-    std.debug.print("Encoding image... ", .{});
-
-    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
-
-    std.debug.print("Done\n", .{});
-    return qanv;
-}
-
-fn run_upsilon(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
-    opt.print();
-
-    var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
-    defer grid.deinit();
-
-    std.debug.print("Generating... ", .{});
-    try maze.onByName(Grid, &opt.@"type", &grid);
-    std.debug.print("Done\n", .{});
-
-    std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(maze.UpsilonCell).from(grid.pickRandom());
-    std.debug.print("Done\n", .{});
-
-    // if (opt.text) {
-    //     var txt = try hgrd.makeString(&grid);
-    //     defer alloc.free(txt);
-    //     std.debug.print("{s}\n", .{txt});
-    // }
-
-    // if (opt.viz == .path) {
-    //     std.debug.print("Finding longest path...", .{});
-
-    //     // modify distances to be longest path in maze
-    //     var a = grid.distances.?.max().cell;
-    //     var a_dists = try a.distances();
-    //     defer a_dists.deinit();
-
-    //     var b = a_dists.max().cell;
-    //     var a_long = try a_dists.pathTo(b);
-
-    //     grid.distances.?.deinit();
-    //     grid.distances = a_long;
-
-    //     std.debug.print("Done\n", .{});
-    // }
-
-    // std.debug.print("Stats:\n", .{});
-    // {
-    //     var deadends = try grid.deadends();
-    //     defer grid.mem.free(deadends);
-    //     std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
-    // }
-    // if (grid.distances) |dists| {
-    //     var max = dists.max();
-    //     std.debug.print("- {} longest path\n", .{max.distance});
-    // }
-
-    std.debug.print("Encoding image... ", .{});
-
-    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
-
-    std.debug.print("Done\n", .{});
-
     return qanv;
 }
 

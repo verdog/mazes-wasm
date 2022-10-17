@@ -342,6 +342,8 @@ pub const Grid = struct {
     alctr: Allocator,
     prng: *std.rand.DefaultPrng,
 
+    pub const CellT = Cell;
+
     pub fn init(alctr: Allocator, seed: u64, w: u32, h: u32) !Grid {
         var g = Grid{
             .width = w,

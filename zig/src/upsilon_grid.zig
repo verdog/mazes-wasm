@@ -198,6 +198,8 @@ pub const UpsilonGrid = struct {
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
 
+    pub const CellT = UpsilonCell;
+
     pub fn init(alctr: std.mem.Allocator, seed: u64, w: u32, h: u32) !UpsilonGrid {
         var g = UpsilonGrid{
             .width = w,

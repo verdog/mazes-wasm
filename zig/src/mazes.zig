@@ -19,9 +19,20 @@ pub const RecursiveBacktracker = @import("recursive_backtracker.zig").RecursiveB
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
-const Error = error{
+const std = @import("std");
+
+pub const Error = error{
     NoSuchMaze,
 };
+
+pub fn gridSupports(comptime GT: type, op: []const u8) bool {
+    const fields = @typeInfo(GT).Struct.fields;
+    inline for (fields) |f| {
+        if (std.mem.eql(u8, f.name, op))
+            return true;
+    }
+    return false;
+}
 
 pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !void {
     const eq = @import("std").mem.startsWith;
@@ -54,7 +65,7 @@ pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !voi
     }
 }
 
-pub fn makeString(comptime GridT: type, grid: *GridT) ![]u8 {
+pub fn makeString(comptime GridT: type, grid: *GridT) anyerror![]u8 {
     switch (GridT) {
         Grid => return try grid.makeString(),
         HexGrid => return try @import("hex_grid.zig").makeString(grid),

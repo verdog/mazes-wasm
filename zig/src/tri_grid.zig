@@ -194,6 +194,8 @@ pub const TriGrid = struct {
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
 
+    pub const CellT = TriCell;
+
     pub fn init(alctr: std.mem.Allocator, seed: u64, w: u32, h: u32) !TriGrid {
         var g = TriGrid{
             .width = w,

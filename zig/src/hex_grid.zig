@@ -263,6 +263,8 @@ pub const HexGrid = struct {
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
 
+    pub const CellT = HexCell;
+
     pub fn init(alctr: std.mem.Allocator, seed: u64, w: u32, h: u32) !HexGrid {
         var g = HexGrid{
             .width = w,
