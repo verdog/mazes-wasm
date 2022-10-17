@@ -253,8 +253,9 @@ pub fn Distances(comptime CellT: type) type {
                 // TODO unify this
                 if (CellT == Cell) {
                     var itr = cellptr.links();
+                    const here = dists.get(cellptr).?;
                     while (itr.next()) |c| {
-                        const total_weight = dists.get(cellptr).? + c.*.*.weight;
+                        const total_weight = here + c.*.weight;
                         if (dists.get(c.*) == null or total_weight < dists.get(c.*).?) {
                             try frontier.add(c.*);
                             try dists.put(c.*, total_weight);
