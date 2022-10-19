@@ -21,15 +21,15 @@ pub const Sidewinder = struct {
             run[run_len] = cell;
             run_len += 1;
 
-            if ((coin == 0 or cell.north == null) and cell.east != null) {
+            if ((coin == 0 or cell.north() == null) and cell.east() != null) {
                 // east case
-                try cell.bLink(cell.east.?);
-            } else if (coin == 1 or cell.east == null) {
+                try cell.bLink(cell.east().?);
+            } else if (coin == 1 or cell.east() == null) {
                 // north/close run case
                 var choice = random.intRangeLessThan(usize, 0, run_len);
                 var choice_cell = run[choice];
-                if (choice_cell.?.north != null) {
-                    try choice_cell.?.bLink(choice_cell.?.north.?);
+                if (choice_cell.?.north() != null) {
+                    try choice_cell.?.bLink(choice_cell.?.north().?);
                 }
                 run_len = 0;
             }

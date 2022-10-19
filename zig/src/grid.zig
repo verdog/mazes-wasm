@@ -10,70 +10,34 @@ const expectEq = std.testing.expectEqual;
 
 /// a single maze Cell
 pub const Cell = struct {
-    /// iterator over the cells a cell is linked to
-    const LinksI = std.AutoHashMap(*Cell, void).KeyIterator;
-
-    /// iterator over the cells a cell is an orthogonal neighbor to,
-    /// even if the cell isn't actually linked to it.
-    pub const NeighborI = struct {
-        i: usize = 0,
-        parent: *Cell,
-
-        fn init(parent: *Cell) NeighborI {
-            return NeighborI{
-                .parent = parent,
-            };
-        }
-
-        pub fn next(self: *NeighborI) ?*Cell {
-            if (self.i >= 4) return null;
-
-            if (self.i == 0 and self.parent.north != null) {
-                self.i = 1;
-                return self.parent.north;
-            }
-            if (self.i <= 1 and self.parent.south != null) {
-                self.i = 2;
-                return self.parent.south;
-            }
-            if (self.i <= 2 and self.parent.east != null) {
-                self.i = 3;
-                return self.parent.east;
-            }
-            if (self.i <= 3 and self.parent.west != null) {
-                self.i = 4;
-                return self.parent.west;
-            }
-
-            return null;
-        }
-    };
-
-    pub fn init(alctr: Allocator, prng: *std.rand.DefaultPrng, row: u32, col: u32) Cell {
+    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, row: u32, col: u32) Cell {
         return Cell{
             .row = row,
             .col = col,
-            .alctr = alctr,
             .prng = prng,
-            .links_set = std.AutoHashMap(*Cell, void).init(alctr),
+            .alctr = alctr,
         };
     }
 
     pub fn deinit(self: *Cell) void {
-        self.links_set.deinit();
+        _ = self;
     }
 
     /// bidirectional link
     /// self <---> other
     pub fn bLink(self: *Cell, other: *Cell) !void {
-        try self.links_set.put(other, {});
+        try self.mLink(other);
         try other.mLink(self);
     }
 
     /// monodirectional link
     /// self ----> other
     pub fn mLink(self: *Cell, other: *Cell) !void {
-        try self.links_set.put(other, {});
+        if (self.whichNeighbor(other.*)) |i| {
+            self.linked[i] = true;
+            return;
+        }
+        unreachable;
     }
 
     /// unlink `self` from `other` in both directions
@@ -85,22 +49,31 @@ pub const Cell = struct {
     // monodirectional unlink
     fn mUnLink(self: *Cell, other: *Cell) void {
         // no-ops are fine
-        _ = self.links_set.remove(other);
+        if (self.whichNeighbor(other.*)) |i| self.linked[i] = false;
+    }
+
+    fn whichNeighbor(self: Cell, other: Cell) ?u8 {
+        if (self.col == other.col and self.row -% other.row == 1) return 0; // north
+        if (self.col == other.col and other.row -% self.row == 1) return 1; // south
+        if (self.row == other.row and other.col -% self.col == 1) return 2; // east
+        if (self.row == other.row and self.col -% other.col == 1) return 3; // west
+        return null;
     }
 
     /// return true if `self` is linked to `other`
     pub fn isLinked(self: Cell, other: *Cell) bool {
-        return self.links_set.contains(other);
+        if (self.whichNeighbor(other.*)) |i| return self.linked[i];
+        return false;
     }
 
     /// return the number of cells this cell is linked to
     pub fn numLinks(self: Cell) u32 {
-        return self.links_set.count();
+        return @intCast(u32, std.mem.count(bool, &self.linked, &.{true}));
     }
 
     /// return an iterator over cells that `self` is linked to.
-    pub fn links(self: Cell) Cell.LinksI {
-        return self.links_set.keyIterator();
+    pub fn links(self: Cell) [4]?*Cell {
+        return self.getNeighbors(true);
     }
 
     /// return a random cell from the cells that are linked to this cell
@@ -110,10 +83,11 @@ pub const Cell = struct {
         var actual_links: u8 = 0;
         var potential_links = [_]?*Cell{null} ** max_links;
 
-        var iter = self.links();
-        while (iter.next()) |nei| {
-            potential_links[actual_links] = nei.*;
-            actual_links += 1;
+        for (self.links()) |mlink| {
+            if (mlink) |nei| {
+                potential_links[actual_links] = nei;
+                actual_links += 1;
+            }
         }
 
         if (actual_links != 0) {
@@ -125,28 +99,35 @@ pub const Cell = struct {
         }
     }
 
+    fn getNeighbors(self: Cell, require_linked: bool) [4]?*Cell {
+        var result = [_]?*Cell{null} ** 4;
+        var i: usize = 0;
+        for (self.neighbors_buf) |mnei| {
+            if (mnei) |nei| {
+                if (!require_linked or self.isLinked(nei)) {
+                    result[i] = nei;
+                    i += 1;
+                }
+            }
+        }
+        return result;
+    }
+
     /// return an iterator over cells that are orthogonal to `self`.
     /// returned cells need not be actually linked to `self`.
-    pub fn neighbors(self: *Cell) Cell.NeighborI {
-        return Cell.NeighborI.init(self);
+    pub fn neighbors(self: *Cell) [4]?*Cell {
+        return self.getNeighbors(false);
     }
 
     /// return a random cell from the cells that are orthogonal to this cell
     pub fn randomNeighbor(self: *Cell) ?*Cell {
-        // XXX: Assumes the maximum amount of neighbors a cell can have is 4
-        const max_neighbors = 4;
-        var actual_neighbors: u8 = 0;
-        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+        var neis_buf = self.neighbors();
 
-        var iter = self.neighbors();
-        while (iter.next()) |nei| {
-            potential_neighbors[actual_neighbors] = nei;
-            actual_neighbors += 1;
-        }
+        var neis = std.mem.sliceTo(&neis_buf, null);
 
-        if (actual_neighbors != 0) {
-            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
-            return potential_neighbors[choice];
+        if (neis[0] != null) {
+            var choice = self.prng.random().intRangeLessThan(usize, 0, neis.len);
+            return neis[choice];
         } else {
             return null;
         }
@@ -156,17 +137,20 @@ pub const Cell = struct {
     /// and don't have a link to any other cell
     pub fn randomNeighborUnlinked(self: *Cell) ?*Cell {
         // XXX: Assumes the maximum amount of neighbors a cell can have is 4
-        const max_neighbors = 4;
-        var actual_neighbors: u8 = 0;
-        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+        var potential_neighbors_buf = [_]*Cell{undefined} ** 32;
+        var actual_neighbors: usize = 0;
 
-        var iter = self.neighbors();
-        while (iter.next()) |nei| {
-            if (nei.numLinks() == 0) {
-                potential_neighbors[actual_neighbors] = nei;
-                actual_neighbors += 1;
+        var neis = self.neighbors();
+        for (neis) |mnei| {
+            if (mnei) |nei| {
+                if (nei.numLinks() == 0) {
+                    potential_neighbors_buf[actual_neighbors] = nei;
+                    actual_neighbors += 1;
+                }
             }
         }
+
+        const potential_neighbors = potential_neighbors_buf[0..actual_neighbors];
 
         if (actual_neighbors != 0) {
             var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
@@ -180,17 +164,20 @@ pub const Cell = struct {
     /// and do have a link to any other cell
     pub fn randomNeighborLinked(self: *Cell) ?*Cell {
         // XXX: Assumes the maximum amount of neighbors a cell can have is 4
-        const max_neighbors = 4;
-        var actual_neighbors: u8 = 0;
-        var potential_neighbors = [_]?*Cell{null} ** max_neighbors;
+        var potential_neighbors_buf = [_]*Cell{undefined} ** 32;
+        var actual_neighbors: usize = 0;
 
-        var iter = self.neighbors();
-        while (iter.next()) |nei| {
-            if (nei.numLinks() > 0) {
-                potential_neighbors[actual_neighbors] = nei;
-                actual_neighbors += 1;
+        var neis = self.neighbors();
+        for (neis) |mnei| {
+            if (mnei) |nei| {
+                if (nei.numLinks() > 0) {
+                    potential_neighbors_buf[actual_neighbors] = nei;
+                    actual_neighbors += 1;
+                }
             }
         }
+
+        const potential_neighbors = potential_neighbors_buf[0..actual_neighbors];
 
         if (actual_neighbors != 0) {
             var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
@@ -200,18 +187,33 @@ pub const Cell = struct {
         }
     }
 
+    pub fn north(self: Cell) ?*Cell {
+        return self.neighbors_buf[0];
+    }
+
+    pub fn south(self: Cell) ?*Cell {
+        return self.neighbors_buf[1];
+    }
+
+    pub fn east(self: Cell) ?*Cell {
+        return self.neighbors_buf[2];
+    }
+
+    pub fn west(self: Cell) ?*Cell {
+        return self.neighbors_buf[3];
+    }
+
     row: u32 = 0,
     col: u32 = 0,
     weight: u32 = 1,
+    alctr: std.mem.Allocator,
 
-    alctr: Allocator,
     prng: *std.rand.DefaultPrng,
-    links_set: std.AutoHashMap(*Cell, void),
 
-    north: ?*Cell = null,
-    south: ?*Cell = null,
-    east: ?*Cell = null,
-    west: ?*Cell = null,
+    // north, south, east, west
+    neighbors_buf: [4]?*Cell = [_]?*Cell{null} ** 4,
+    // linked[i] is true is this cell is linked to neighbors_buf[i]
+    linked: [4]bool = [_]bool{false} ** 4,
 };
 
 pub fn Distances(comptime CellT: type) type {
@@ -250,24 +252,11 @@ pub fn Distances(comptime CellT: type) type {
 
             while (frontier.count() > 0) {
                 var cellptr = frontier.remove();
-                // TODO unify this
-                if (CellT == Cell) {
-                    var itr = cellptr.links();
-                    const here = dists.get(cellptr).?;
-                    while (itr.next()) |c| {
-                        const total_weight = here + c.*.weight;
-                        if (dists.get(c.*) == null or total_weight < dists.get(c.*).?) {
-                            try frontier.add(c.*);
-                            try dists.put(c.*, total_weight);
-                        }
-                    }
-                } else {
-                    for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
-                        const total_weight = dists.get(cellptr).? + c.?.weight;
-                        if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
-                            try frontier.add(c.?);
-                            try dists.put(c.?, total_weight);
-                        }
+                for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
+                    const total_weight = dists.get(cellptr).? + c.?.weight;
+                    if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
+                        try frontier.add(c.?);
+                        try dists.put(c.?, total_weight);
                     }
                 }
             }
@@ -301,11 +290,11 @@ pub fn Distances(comptime CellT: type) type {
             try breadcrumbs.put(current, this.dists.get(current).?);
 
             while (current != this.root) {
-                var iter = current.links();
-                while (iter.next()) |neighbor| {
-                    if (this.dists.get(neighbor.*).? < this.dists.get(current).?) {
-                        try breadcrumbs.put(neighbor.*, this.dists.get(neighbor.*).?);
-                        current = neighbor.*;
+                for (current.links()) |mnei| {
+                    var neighbor = mnei.?;
+                    if (this.dists.get(neighbor).? < this.dists.get(current).?) {
+                        try breadcrumbs.put(neighbor, this.dists.get(neighbor).?);
+                        current = neighbor;
                         break;
                     }
                 }
@@ -462,10 +451,10 @@ pub const Grid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            if (y > 0) cell.*.north = self.at(x, y -| 1);
-            if (y < self.height - 1) cell.*.south = self.at(x, y +| 1);
-            if (x < self.width - 1) cell.*.east = self.at(x +| 1, y);
-            if (x > 0) cell.*.west = self.at(x -| 1, y);
+            if (y > 0) cell.neighbors_buf[0] = self.at(x, y -| 1);
+            if (y < self.height - 1) cell.neighbors_buf[1] = self.at(x, y +| 1);
+            if (x < self.width - 1) cell.neighbors_buf[2] = self.at(x +| 1, y);
+            if (x > 0) cell.neighbors_buf[3] = self.at(x -| 1, y);
         }
     }
 
@@ -523,7 +512,7 @@ pub const Grid = struct {
                 try w(&ret, &i, "|");
                 for (row_slice) |*cell| {
                     var data: [4]u8 = "   |".*;
-                    if (cell.east != null and cell.isLinked(cell.east.?)) data[3] = ' ';
+                    if (cell.east() != null and cell.isLinked(cell.east().?)) data[3] = ' ';
                     data[1] = self.contentsOf(cell);
                     try w(&ret, &i, &data);
                 }
@@ -532,7 +521,7 @@ pub const Grid = struct {
                 // row 2
                 try w(&ret, &i, "+");
                 for (row_slice) |cell| {
-                    try w(&ret, &i, if (cell.south != null and cell.isLinked(cell.south.?) == true) "   +" else "---+");
+                    try w(&ret, &i, if (cell.south() != null and cell.isLinked(cell.south().?) == true) "   +" else "---+");
                 }
                 try w(&ret, &i, "\n");
             }
@@ -594,11 +583,11 @@ pub const Grid = struct {
                 const y1 = cell.row * cell_size + border_size;
                 const y2 = (cell.row + 1) * cell_size + border_size;
 
-                if (cell.north == null) try qanv.line(wall, x1, x2, y1, y1);
-                if (cell.west == null) try qanv.line(wall, x1, x1, y1, y2);
+                if (cell.north() == null) try qanv.line(wall, x1, x2, y1, y1);
+                if (cell.west() == null) try qanv.line(wall, x1, x1, y1, y2);
 
-                if (cell.east == null or !cell.isLinked(cell.east.?)) try qanv.line(wall, x2, x2, y1, y2 + 1);
-                if (cell.south == null or !cell.isLinked(cell.south.?)) try qanv.line(wall, x1, x2 + 1, y2, y2);
+                if (cell.east() == null or !cell.isLinked(cell.east().?)) try qanv.line(wall, x2, x2, y1, y2 + 1);
+                if (cell.south() == null or !cell.isLinked(cell.south().?)) try qanv.line(wall, x1, x2 + 1, y2, y2);
             }
         }
 
@@ -620,7 +609,7 @@ test "Cell can link to another Cell" {
 
     var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, &prng, 0, 0);
+    var b = Cell.init(alloc, &prng, 0, 1);
     defer b.deinit();
 
     try a.bLink(&b);
@@ -635,7 +624,7 @@ test "Cell can unlink after linking another Cell" {
 
     var a = Cell.init(alloc, &prng, 0, 0);
     defer a.deinit();
-    var b = Cell.init(alloc, &prng, 0, 0);
+    var b = Cell.init(alloc, &prng, 0, 1);
     defer b.deinit();
 
     try a.bLink(&b);
@@ -649,36 +638,36 @@ test "Cell can unlink after linking another Cell" {
     try expect(b.isLinked(&a) == false);
 }
 
-test "Cell provides an iterator over its links" {
+test "Cell provides packed array of links" {
     var alloc = std.testing.allocator;
     var prng = std.rand.DefaultPrng.init(0);
 
-    var a = Cell.init(alloc, &prng, 0, 0);
+    var a = Cell.init(alloc, &prng, 1, 1);
     defer a.deinit();
     var b = Cell.init(alloc, &prng, 1, 0);
     defer b.deinit();
-    var c = Cell.init(alloc, &prng, 2, 0);
+    var c = Cell.init(alloc, &prng, 1, 2);
     defer c.deinit();
-    var d = Cell.init(alloc, &prng, 3, 0);
+    var d = Cell.init(alloc, &prng, 0, 1);
     defer d.deinit();
+
+    a.neighbors_buf[0] = &d; // north
+    a.neighbors_buf[2] = &c; // east
+    a.neighbors_buf[3] = &b; // west
 
     try a.bLink(&b);
     try a.bLink(&c);
     try a.bLink(&d);
 
-    {
-        var it = a.links();
-        var count: u32 = 0;
-        while (it.next()) |link| {
-            _ = link;
-            count += 1;
-        }
-
-        try expectEq(@as(@TypeOf(count), 3), count);
+    var count: usize = 0;
+    for (a.links()) |mlink| {
+        if (mlink) |_| count += 1;
     }
+
+    try expectEq(@as(@TypeOf(count), 3), count);
 }
 
-test "Cell provides a list of its neighbors" {
+test "Cell provides a packed array of its neighbors" {
     var alloc = std.testing.allocator;
     var prng = std.rand.DefaultPrng.init(0);
 
@@ -689,19 +678,15 @@ test "Cell provides a list of its neighbors" {
     var c = Cell.init(alloc, &prng, 2, 0);
     defer c.deinit();
 
-    b.west = &a;
-    b.east = &c;
+    b.neighbors_buf[3] = &a; // west
+    b.neighbors_buf[2] = &c; // east
 
-    {
-        var it = b.neighbors();
-        var count: u32 = 0;
-        while (it.next()) |nei| {
-            _ = nei;
-            count += 1;
-        }
-
-        try expectEq(@as(@TypeOf(count), 2), count);
+    var count: usize = 0;
+    for (b.neighbors()) |mnei| {
+        if (mnei) |_| count += 1;
     }
+
+    try expectEq(@as(@TypeOf(count), 2), count);
 }
 test "Construct and destruct a Grid" {
     var alloc = std.testing.allocator;

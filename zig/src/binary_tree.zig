@@ -17,7 +17,7 @@ pub const BinaryTree = struct {
         for (grid.cells_buf) |*cell| {
             // Of the cell's north and east neighbors, if it has them at all,
             // pick a random cell from the two and link it.
-            var candidates: [2]?*Cell = .{ cell.north, cell.east };
+            var candidates: [2]?*Cell = .{ cell.north(), cell.east() };
             var non_null: u2 = 0;
             for (candidates) |ptr| {
                 if (ptr != null) non_null += 1;
