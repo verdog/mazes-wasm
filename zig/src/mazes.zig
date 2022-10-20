@@ -26,8 +26,8 @@ pub const Error = error{
 };
 
 pub fn gridSupports(comptime GT: type, op: []const u8) bool {
-    const fields = @typeInfo(GT).Struct.fields;
-    inline for (fields) |f| {
+    const decls = @typeInfo(GT).Struct.decls;
+    inline for (decls) |f| {
         if (std.mem.eql(u8, f.name, op))
             return true;
     }
@@ -98,4 +98,42 @@ test "Test mazes" {
     _ = @import("fast.zig");
     _ = @import("hunt_and_kill.zig");
     _ = @import("recursive_backtracker.zig");
+}
+
+// api requirements for a grid
+const types = [_]type{ Grid, HexGrid, TriGrid, UpsilonGrid };
+
+test "grid api" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            const alctr = std.testing.allocator;
+            var g = try GridT.init(alctr, 0, 4, 4);
+            defer g.deinit();
+
+            // size
+            try std.testing.expect(g.size() == 16);
+
+            // at
+            try std.testing.expect(g.at(0, 0) != null);
+            try std.testing.expect(g.at(1, 1) != null);
+            try std.testing.expect(g.at(2, 2) != null);
+            try std.testing.expect(g.at(3, 3) != null);
+            try std.testing.expect(g.at(4, 4) == null);
+
+            // pickRandom
+            {
+                var i: usize = 0;
+                while (i < 1000) : (i += 1) {
+                    try std.testing.expect(g.pickRandom().x < 4);
+                    try std.testing.expect(g.pickRandom().y < 4);
+                }
+            }
+
+            // TODO
+            // _ = try g.deadends();
+            // _ = try g.braid(0.25);
+        }
+    }.tst;
+
+    inline for (types) |t| try tst(t);
 }

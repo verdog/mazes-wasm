@@ -10,10 +10,10 @@ const expectEq = std.testing.expectEqual;
 
 /// a single maze Cell
 pub const Cell = struct {
-    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, row: u32, col: u32) Cell {
+    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, y: u32, x: u32) Cell {
         return Cell{
-            .row = row,
-            .col = col,
+            .y = y,
+            .x = x,
             .prng = prng,
             .alctr = alctr,
         };
@@ -53,10 +53,10 @@ pub const Cell = struct {
     }
 
     fn whichNeighbor(self: Cell, other: Cell) ?u8 {
-        if (self.col == other.col and self.row -% other.row == 1) return 0; // north
-        if (self.col == other.col and other.row -% self.row == 1) return 1; // south
-        if (self.row == other.row and other.col -% self.col == 1) return 2; // east
-        if (self.row == other.row and self.col -% other.col == 1) return 3; // west
+        if (self.x == other.x and self.y -% other.y == 1) return 0; // north
+        if (self.x == other.x and other.y -% self.y == 1) return 1; // south
+        if (self.y == other.y and other.x -% self.x == 1) return 2; // east
+        if (self.y == other.y and self.x -% other.x == 1) return 3; // west
         return null;
     }
 
@@ -203,8 +203,8 @@ pub const Cell = struct {
         return self.neighbors_buf[3];
     }
 
-    row: u32 = 0,
-    col: u32 = 0,
+    y: u32 = 0,
+    x: u32 = 0,
     weight: u32 = 1,
     alctr: std.mem.Allocator,
 
@@ -403,9 +403,8 @@ pub const Grid = struct {
             // filter out already linked
             var unlinked_buf = [_]?*Cell{null} ** 4;
             var ulen: usize = 0;
-            {
-                var neii = cell.neighbors();
-                while (neii.next()) |nei| {
+            for (cell.neighbors()) |mnei| {
+                if (mnei) |nei| {
                     if (!cell.isLinked(nei)) {
                         unlinked_buf[ulen] = nei;
                         ulen += 1;
@@ -556,10 +555,10 @@ pub const Grid = struct {
         qanv.clear(background);
 
         for (self.cells_buf) |*cell| {
-            const x1 = cell.col * cell_size + border_size;
-            const x2 = (cell.col + 1) * cell_size + border_size;
-            const y1 = cell.row * cell_size + border_size;
-            const y2 = (cell.row + 1) * cell_size + border_size;
+            const x1 = cell.x * cell_size + border_size;
+            const x2 = (cell.x + 1) * cell_size + border_size;
+            const y1 = cell.y * cell_size + border_size;
+            const y2 = (cell.y + 1) * cell_size + border_size;
 
             if (self.distances) |dists| {
                 if (dists.get(cell)) |thedist| {
@@ -578,10 +577,10 @@ pub const Grid = struct {
             const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 15, .green = 10, .blue = 10 } };
 
             for (self.cells_buf) |*cell| {
-                const x1 = cell.col * cell_size + border_size;
-                const x2 = (cell.col + 1) * cell_size + border_size;
-                const y1 = cell.row * cell_size + border_size;
-                const y2 = (cell.row + 1) * cell_size + border_size;
+                const x1 = cell.x * cell_size + border_size;
+                const x2 = (cell.x + 1) * cell_size + border_size;
+                const y1 = cell.y * cell_size + border_size;
+                const y2 = (cell.y + 1) * cell_size + border_size;
 
                 if (cell.north() == null) try qanv.line(wall, x1, x2, y1, y1);
                 if (cell.west() == null) try qanv.line(wall, x1, x1, y1, y2);

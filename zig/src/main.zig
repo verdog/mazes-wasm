@@ -231,11 +231,10 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     try maze.onByName(Grid, &opt.@"type", &grid);
     std.debug.print("Done\n", .{});
 
-    comptime if (maze.gridSupports(Grid, "braid"))
-        if (opt.braid > 0) {
-            std.debug.print("Braiding...\n", .{});
-            try grid.braid(opt.braid);
-        };
+    if (comptime maze.gridSupports(Grid, "braid") and opt.braid > 0) {
+        std.debug.print("Braiding...\n", .{});
+        try grid.braid(opt.braid);
+    }
 
     if (opt.text) {
         if (maze.makeString(Grid, &grid)) |txt| {
@@ -271,11 +270,11 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
 
     std.debug.print("Stats:\n", .{});
 
-    comptime if (maze.gridSupports(Grid, "deadends")) {
+    if (comptime maze.gridSupports(Grid, "deadends")) {
         var deadends = try grid.deadends();
         defer grid.alctr.free(deadends);
         std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
-    };
+    }
 
     if (grid.distances) |dists| {
         var max = dists.max();
