@@ -227,17 +227,28 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     var grid = try Grid.init(alloc, opt.seed, opt.width, opt.height);
     defer grid.deinit();
 
-    std.debug.print("Generating... ", .{});
-    try maze.onByName(Grid, &opt.@"type", &grid);
-    std.debug.print("Done\n", .{});
+    {
+        std.debug.print("Generating... ", .{});
+        var timer = try std.time.Timer.start();
+        try maze.onByName(Grid, &opt.@"type", &grid);
+        var time = timer.read();
+        std.debug.print("Done ({} microseconds)\n", .{time / 1000});
+    }
 
-    if (comptime maze.gridSupports(Grid, "braid") and opt.braid > 0) {
-        std.debug.print("Braiding...\n", .{});
+    if (opt.braid > 0) {
+        std.debug.print("Braiding...", .{});
+        var timer = try std.time.Timer.start();
         try grid.braid(opt.braid);
+        var time = timer.read();
+        std.debug.print("Done ({} microseconds)\n", .{time / 1000});
     }
 
     if (opt.text) {
+        std.debug.print("Generating text... ", .{});
+        var timer = try std.time.Timer.start();
         if (maze.makeString(Grid, &grid)) |txt| {
+            var time = timer.read();
+            std.debug.print("Done: ({} microseconds)\n", .{time / 1000});
             defer alloc.free(txt);
             std.debug.print("{s}\n", .{txt});
         } else |err| switch (err) {
@@ -246,9 +257,13 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
         }
     }
 
-    std.debug.print("Calcuating distances... ", .{});
-    grid.distances = try maze.Distances(Grid.CellT).from(grid.pickRandom());
-    std.debug.print("Done\n", .{});
+    {
+        std.debug.print("Calcuating distances... ", .{});
+        var timer = try std.time.Timer.start();
+        grid.distances = try maze.Distances(Grid).from(&grid, grid.pickRandom());
+        var time = timer.read();
+        std.debug.print("Done ({} microseconds)\n", .{time / 1000});
+    }
 
     if (Grid == maze.Grid)
         if (opt.viz == .path) {
@@ -256,7 +271,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
 
             // modify distances to be longest path in maze
             var a = grid.distances.?.max().cell;
-            var a_dists = try maze.Distances(Grid.CellT).from(a);
+            var a_dists = try maze.Distances(Grid).from(&grid, a);
             defer a_dists.deinit();
 
             var b = a_dists.max().cell;
@@ -270,23 +285,30 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
 
     std.debug.print("Stats:\n", .{});
 
-    if (comptime maze.gridSupports(Grid, "deadends")) {
+    {
+        var timer = try std.time.Timer.start();
         var deadends = try grid.deadends();
         defer grid.alctr.free(deadends);
-        std.debug.print("- {} dead ends ({d}%)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100 });
+        var time = timer.read();
+        std.debug.print("- {} dead ends ({d}%) (Calculated in {} microseconds)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100, time / 1000 });
     }
 
     if (grid.distances) |dists| {
+        var timer = try std.time.Timer.start();
         var max = dists.max();
-        std.debug.print("- {} longest path\n", .{max.distance});
+        var time = timer.read();
+        std.debug.print("- {} longest path (Calculated in {} microseconds)\n", .{ max.distance, time / 1000 });
     }
 
-    std.debug.print("Encoding image... ", .{});
+    {
+        std.debug.print("Encoding image... ", .{});
+        var timer = try std.time.Timer.start();
+        var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
+        var time = timer.read();
+        std.debug.print("Done ({} microseconds)\n", .{time / 1000});
 
-    var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
-
-    std.debug.print("Done\n", .{});
-    return qanv;
+        return qanv;
+    }
 }
 
 test "Run all tests" {

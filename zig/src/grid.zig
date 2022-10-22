@@ -4,6 +4,8 @@ const std = @import("std");
 const qoi = @import("qoi.zig");
 const qan = @import("qanvas.zig");
 
+const Distances = @import("distances.zig").Distances;
+
 const Allocator = std.mem.Allocator;
 const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
@@ -216,117 +218,11 @@ pub const Cell = struct {
     linked: [4]bool = [_]bool{false} ** 4,
 };
 
-pub fn Distances(comptime CellT: type) type {
-    return struct {
-        root: *CellT,
-        alloc: Allocator,
-        dists: std.AutoHashMap(*CellT, u32),
-
-        pub fn init(alloc: Allocator, root: *CellT) Self {
-            var d: Distances(CellT) = .{
-                .root = root,
-                .alloc = alloc,
-                .dists = std.AutoHashMap(*CellT, u32).init(alloc),
-            };
-
-            return d;
-        }
-
-        pub fn from(cell: *CellT) !Distances(CellT) {
-            var dists = Distances(CellT).init(cell.alctr, cell);
-            try dists.dists.put(cell, cell.weight);
-
-            const comp = struct {
-                fn f(_: void, a: *CellT, b: *CellT) std.math.Order {
-                    if (a.weight < b.weight) return .lt;
-                    if (a.weight == b.weight) return .eq;
-                    if (a.weight > b.weight) return .gt;
-                    unreachable;
-                }
-            }.f;
-
-            var frontier = std.PriorityQueue(*CellT, void, comp).init(dists.alloc, {});
-            defer frontier.deinit();
-
-            try frontier.add(cell);
-
-            while (frontier.count() > 0) {
-                var cellptr = frontier.remove();
-                for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
-                    const total_weight = dists.get(cellptr).? + c.?.weight;
-                    if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
-                        try frontier.add(c.?);
-                        try dists.put(c.?, total_weight);
-                    }
-                }
-            }
-
-            return dists;
-        }
-
-        pub fn deinit(this: *Self) void {
-            this.dists.deinit();
-        }
-
-        pub fn get(this: Self, cell: *CellT) ?u32 {
-            return if (this.dists.contains(cell))
-                this.dists.get(cell).?
-            else
-                return null;
-        }
-
-        pub fn put(this: *Self, cell: *CellT, dist: u32) !void {
-            try this.dists.put(cell, dist);
-        }
-
-        pub fn it(this: Self) this.dists.KeyIterator {
-            return this.dists;
-        }
-
-        pub fn pathTo(this: Self, goal: *CellT) !Distances(CellT) {
-            var current = goal;
-
-            var breadcrumbs = Distances(CellT).init(this.alloc, this.root);
-            try breadcrumbs.put(current, this.dists.get(current).?);
-
-            while (current != this.root) {
-                for (current.links()) |mnei| {
-                    var neighbor = mnei.?;
-                    if (this.dists.get(neighbor).? < this.dists.get(current).?) {
-                        try breadcrumbs.put(neighbor, this.dists.get(neighbor).?);
-                        current = neighbor;
-                        break;
-                    }
-                }
-            }
-
-            return breadcrumbs;
-        }
-
-        pub fn max(this: Self) struct { cell: *CellT, distance: u32 } {
-            var dist: u32 = 0;
-            var cell = this.root;
-
-            var iter = this.dists.iterator();
-            while (iter.next()) |entry| {
-                if (entry.value_ptr.* > dist) {
-                    dist = entry.value_ptr.*;
-                    cell = entry.key_ptr.*;
-                }
-            }
-
-            return .{ .cell = cell, .distance = if (dist != 0) dist else std.math.maxInt(u32) };
-        }
-
-        const Self = @This();
-    };
-}
-
 pub const Grid = struct {
     width: u32,
     height: u32,
     cells_buf: []Cell = undefined,
-    distances: ?Distances(Cell) = null,
+    distances: ?Distances(Grid) = null,
 
     alctr: Allocator,
     prng: *std.rand.DefaultPrng,
@@ -616,12 +512,4 @@ test "Grid.makeString() returns a perfect, closed grid before modification" {
         \\
     ;
     try expectEq(true, std.mem.eql(u8, s, m));
-}
-
-test "Create/Destroy distances" {
-    var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 0, 5, 5);
-    defer g.deinit();
-
-    g.distances = try Distances(Cell).from(&g.cells_buf[0]);
 }

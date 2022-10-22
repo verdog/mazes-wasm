@@ -7,7 +7,7 @@ pub const TriCell = @import("tri_grid.zig").TriCell;
 pub const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
 pub const UpsilonCell = @import("upsilon_grid.zig").UpsilonCell;
 
-pub const Distances = @import("grid.zig").Distances;
+pub const Distances = @import("distances.zig").Distances;
 
 pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
 pub const Sidewinder = @import("sidewinder.zig").Sidewinder;
@@ -89,6 +89,8 @@ test "Test mazes" {
     _ = @import("hex_grid.zig");
     _ = @import("tri_grid.zig");
     _ = @import("upsilon_grid.zig");
+
+    _ = @import("distances.zig");
 
     // algorithms
     _ = @import("binary_tree.zig");

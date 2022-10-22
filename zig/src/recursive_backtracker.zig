@@ -4,7 +4,7 @@ const std = @import("std");
 
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
-const Distances = @import("grid.zig").Distances;
+const Distances = @import("distances.zig").Distances;
 const HexGrid = @import("hex_grid.zig").HexGrid;
 const HexCell = @import("hex_grid.zig").HexCell;
 const TriGrid = @import("tri_grid.zig").TriGrid;
@@ -111,7 +111,7 @@ test "RecursiveBacktracker distances" {
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
+    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -151,7 +151,7 @@ test "RecursiveBacktracker path" {
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try Distances(Cell).from(grid.at(0, 0).?);
+    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

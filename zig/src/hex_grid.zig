@@ -5,7 +5,7 @@ const qoi = @import("qoi.zig");
 const qan = @import("qanvas.zig");
 const u = @import("u.zig");
 
-const Distances = @import("grid.zig").Distances;
+const Distances = @import("distances.zig").Distances;
 
 pub const Error = error{
     HexCellError,
@@ -280,7 +280,7 @@ pub const HexGrid = struct {
     width: u32,
     height: u32,
     cells_buf: []HexCell = undefined,
-    distances: ?Distances(HexCell) = null,
+    distances: ?Distances(HexGrid) = null,
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,

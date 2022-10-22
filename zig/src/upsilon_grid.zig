@@ -5,7 +5,7 @@ const qoi = @import("qoi.zig");
 const qan = @import("qanvas.zig");
 const u = @import("u.zig");
 
-pub const Distances = @import("grid.zig").Distances(UpsilonCell);
+pub const Distances = @import("distances.zig").Distances(UpsilonGrid);
 
 pub const Error = error{
     UpsilonMazeError,
