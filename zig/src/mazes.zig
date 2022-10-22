@@ -101,39 +101,367 @@ test "Test mazes" {
 }
 
 // api requirements for a grid
-const types = [_]type{ Grid, HexGrid, TriGrid, UpsilonGrid };
+const test_types = [_]type{ Grid, HexGrid, TriGrid, UpsilonGrid };
 
-test "grid api" {
+fn test_getGrid(comptime GridT: type) !GridT {
+    const alctr = std.testing.allocator;
+    var g = try GridT.init(alctr, 0, 4, 4);
+    return g;
+}
+
+fn test_getBigGrid(comptime GridT: type) !GridT {
+    const alctr = std.testing.allocator;
+    var g = try GridT.init(alctr, 0, 1024, 1024);
+    return g;
+}
+
+test "grid api: create/destroy" {
     const tst = struct {
         fn tst(comptime GridT: type) !void {
-            const alctr = std.testing.allocator;
-            var g = try GridT.init(alctr, 0, 4, 4);
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: size" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            {
+                var g = try test_getGrid(GridT);
+                defer g.deinit();
+                try std.testing.expect(g.size() == 16);
+            }
+            {
+                var g = try test_getBigGrid(GridT);
+                defer g.deinit();
+                try std.testing.expect(g.size() == 1024 * 1024);
+            }
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: at" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
             defer g.deinit();
 
-            // size
-            try std.testing.expect(g.size() == 16);
-
-            // at
             try std.testing.expect(g.at(0, 0) != null);
             try std.testing.expect(g.at(1, 1) != null);
             try std.testing.expect(g.at(2, 2) != null);
             try std.testing.expect(g.at(3, 3) != null);
+            try std.testing.expect(g.at(0, 4) == null);
+            try std.testing.expect(g.at(4, 0) == null);
             try std.testing.expect(g.at(4, 4) == null);
-
-            // pickRandom
-            {
-                var i: usize = 0;
-                while (i < 1000) : (i += 1) {
-                    try std.testing.expect(g.pickRandom().x < 4);
-                    try std.testing.expect(g.pickRandom().y < 4);
-                }
-            }
-
-            // TODO
-            // _ = try g.deadends();
-            // _ = try g.braid(0.25);
         }
     }.tst;
 
-    inline for (types) |t| try tst(t);
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: pickRandom" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+
+            var i: usize = 0;
+            while (i < 1000) : (i += 1) {
+                try std.testing.expect(g.pickRandom().x < 4);
+                try std.testing.expect(g.pickRandom().y < 4);
+            }
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: cells don't blow up when making random choices" {
+    // this test was born out of incorrectly handling the grid's prng member.
+    // it used to fail.
+
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var alloc = std.testing.allocator;
+            // note that seed 1 makes the last check succeed
+            var g = try GridT.init(alloc, 1, 5, 5);
+            defer g.deinit();
+
+            var choice = g.prng.random().intRangeLessThan(usize, 0, 10);
+            var choice2 = g.prng.random().intRangeLessThan(usize, 0, 10);
+
+            try std.testing.expect(choice < 10);
+            try std.testing.expect(choice != choice2);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: deadends" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            {
+                // a dead end is defined as a cell with one link.
+                // un-mazified grids should have no dead ends.
+                const des = try g.deadends();
+
+                defer g.alctr.free(des);
+                try std.testing.expect(des.len == 0);
+            }
+
+            {
+                // [d d]
+                try g.at(0, 1).?.bLink(g.at(1, 1).?);
+
+                const des = try g.deadends();
+                defer g.alctr.free(des);
+
+                try std.testing.expect(des.len == 2);
+            }
+
+            {
+                // [d _ _ d]
+                try g.at(1, 1).?.bLink(g.at(2, 1).?);
+                try g.at(2, 1).?.bLink(g.at(3, 1).?);
+
+                const des = try g.deadends();
+                defer g.alctr.free(des);
+
+                try std.testing.expect(des.len == 2);
+            }
+
+            {
+                // [d   _ d]
+                //   |d|
+                try g.at(1, 1).?.bLink(g.at(1, 2).?);
+
+                const des = try g.deadends();
+                defer g.alctr.free(des);
+
+                try std.testing.expectEqual(@as(usize, 3), des.len);
+            }
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "grid api: braid" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            // braid removes dead ends with a probability between 0 and 1.
+            // braiding also prefers linking two dead ends over two random cells.
+            // XXX: currently the implementation only iterates over dead ends.
+
+            // [_ _|_ _]
+            try g.at(0, 0).?.bLink(g.at(1, 0).?);
+            try g.at(2, 0).?.bLink(g.at(3, 0).?);
+
+            {
+                // shouldn't change maze
+                try g.braid(0);
+                const des = try g.deadends();
+                defer g.alctr.free(des);
+                try std.testing.expectEqual(@as(usize, 4), des.len);
+            }
+
+            {
+                try g.braid(1);
+                const des = try g.deadends();
+                defer g.alctr.free(des);
+                // the two ends of the tunnel
+                try std.testing.expectEqual(@as(usize, 2), des.len);
+            }
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            const CellT = GridT.CellT;
+            _ = CellT;
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: construct/destruct" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            const CellT = GridT.CellT;
+
+            var alloc = std.testing.allocator;
+            var prng = std.rand.DefaultPrng.init(0);
+
+            var c = CellT.init(alloc, &prng, 0, 0);
+            defer c.deinit();
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: bLink" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            const CellT = GridT.CellT;
+
+            var alloc = std.testing.allocator;
+            var prng = std.rand.DefaultPrng.init(0);
+
+            var a = CellT.init(alloc, &prng, 0, 0);
+            defer a.deinit();
+            var b = CellT.init(alloc, &prng, 0, 1);
+            defer b.deinit();
+
+            try a.bLink(&b);
+
+            try std.testing.expect(a.isLinked(&b) == true);
+            try std.testing.expect(b.isLinked(&a) == true);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: unLink" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            const CellT = GridT.CellT;
+
+            var alloc = std.testing.allocator;
+            var prng = std.rand.DefaultPrng.init(0);
+
+            var a = CellT.init(alloc, &prng, 0, 0);
+            defer a.deinit();
+            var b = CellT.init(alloc, &prng, 0, 1);
+            defer b.deinit();
+
+            try a.bLink(&b);
+
+            try std.testing.expect(a.isLinked(&b) == true);
+            try std.testing.expect(b.isLinked(&a) == true);
+
+            a.unLink(&b);
+
+            try std.testing.expect(a.isLinked(&b) == false);
+            try std.testing.expect(b.isLinked(&a) == false);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: links" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            // note this arrangement of cells is sensitive because of how trigrid works.
+            // depending on its location in the grid, a tricell can't link to either a cell
+            // above or a cell below it (the point of the triangle has no linkable edge)
+            try g.at(1, 1).?.bLink(g.at(0, 1).?);
+            try g.at(1, 1).?.bLink(g.at(2, 1).?);
+            try g.at(1, 1).?.bLink(g.at(1, 2).?);
+
+            var count: usize = 0;
+            for (g.at(1, 1).?.links()) |mlink| {
+                if (mlink) |_| count += 1;
+            }
+
+            try std.testing.expectEqual(@as(@TypeOf(count), 3), count);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: neighbors" {
+    const tst = struct {
+        fn countNonNullNeighbors(cell: anytype) u32 {
+            var count: u32 = 0;
+            for (cell.neighbors()) |mnei| {
+                if (mnei != null) {
+                    count += 1;
+                }
+            }
+            return count;
+        }
+
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            switch (GridT.CellT) {
+                Grid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 4),
+                HexGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 6),
+                TriGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 3),
+                UpsilonGrid.CellT => {
+                    try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 8);
+                    try std.testing.expect(countNonNullNeighbors(g.at(2, 1).?) == 4);
+                },
+                else => return error.UntestedCell,
+            }
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: randomLink" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            try std.testing.expect(g.at(0, 0).?.randomLink() == null);
+
+            var first = g.at(0, 0).?;
+            var second = g.at(0, 1).?;
+            try first.bLink(second);
+
+            try std.testing.expect(first.isLinked(second) == true);
+            try std.testing.expect(second.isLinked(first) == true);
+
+            try std.testing.expect(first.randomLink() != null);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
+}
+
+test "cell api: randomNeighbor" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            try std.testing.expect(g.at(0, 0).?.randomNeighbor() != null);
+        }
+    }.tst;
+
+    inline for (test_types) |t| try tst(t);
 }

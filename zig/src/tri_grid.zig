@@ -120,6 +120,28 @@ pub const TriCell = struct {
         return self.getNeighbors(true);
     }
 
+    pub fn randomLink(self: TriCell) ?*TriCell {
+        // XXX: Assumes the maximum amount of links a cell can have is 3
+        const max_links = 3;
+        var actual_links: u8 = 0;
+        var potential_links = [_]?*TriCell{null} ** max_links;
+
+        for (self.links()) |mlink| {
+            if (mlink) |nei| {
+                potential_links[actual_links] = nei;
+                actual_links += 1;
+            }
+        }
+
+        if (actual_links != 0) {
+            var random = self.prng.random();
+            const choice = random.intRangeLessThan(usize, 0, actual_links);
+            return potential_links[choice];
+        } else {
+            return null;
+        }
+    }
+
     pub fn numLinks(self: TriCell) usize {
         var count: usize = 0;
         for (self.linked) |b| {
@@ -253,6 +275,65 @@ pub const TriGrid = struct {
     pub fn pickRandom(self: TriGrid) *TriCell {
         const i = self.prng.random().intRangeLessThan(usize, 0, self.size());
         return &self.cells_buf[i];
+    }
+
+    pub fn deadends(self: *TriGrid) ![]*TriCell {
+        var list = std.ArrayList(*TriCell).init(self.alctr);
+        defer list.deinit();
+
+        for (self.cells_buf) |*cell| {
+            if (cell.numLinks() == 1) {
+                try list.append(cell);
+            }
+        }
+
+        return list.toOwnedSlice();
+    }
+
+    pub fn braid(self: *TriGrid, p: f64) !void {
+        var ddends = try self.deadends();
+        defer self.alctr.free(ddends);
+
+        self.prng.random().shuffle(*TriCell, ddends);
+
+        for (ddends) |cell| {
+            const pick = self.prng.random().float(f64);
+            if (pick > p or cell.numLinks() != 1) continue;
+
+            // filter out already linked
+            var unlinked_buf = [_]?*TriCell{null} ** 4;
+            var ulen: usize = 0;
+            for (cell.neighbors()) |mnei| {
+                if (mnei) |nei| {
+                    if (!cell.isLinked(nei)) {
+                        unlinked_buf[ulen] = nei;
+                        ulen += 1;
+                    }
+                }
+            }
+            var unlinked = unlinked_buf[0..ulen];
+
+            // tricells can end up with only one neighbor in corners.
+            // when it's linked and filtered out above, unlinked has no cells
+            if (ulen == 0) continue;
+
+            // prefer linked two dead ends together. it looks nice
+            var best_buf = [_]?*TriCell{null} ** 4;
+            var blen: usize = 0;
+            for (unlinked) |unei| {
+                if (unei.?.numLinks() == 1) {
+                    best_buf[blen] = unei;
+                    blen += 1;
+                }
+            }
+            var best = best_buf[0..blen];
+
+            var pool: *[]?*TriCell = if (best.len > 0) &best else &unlinked;
+
+            var choice_i = self.prng.random().intRangeLessThan(usize, 0, pool.len);
+            var choice = pool.*[choice_i];
+            try cell.bLink(choice.?);
+        }
     }
 
     pub fn size(self: TriGrid) usize {
