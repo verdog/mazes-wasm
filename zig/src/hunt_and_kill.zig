@@ -2,12 +2,14 @@
 
 const std = @import("std");
 
-const Grid = @import("grid.zig").Grid;
+const SquareGrid = @import("square_grid.zig").SquareGrid;
 const Distances = @import("distances.zig").Distances;
-const Cell = @import("grid.zig").Cell;
 
 pub const HuntAndKill = struct {
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: anytype) !void {
+        comptime if (@typeInfo(@TypeOf(grid)) != .Pointer)
+            @compileError("Must pass pointer");
+
         var cell = grid.at(0, 0).?;
         var todo = grid.size() - 1;
 
@@ -40,17 +42,22 @@ pub const HuntAndKill = struct {
     }
 };
 
-test "Hunt and Kill" {
-    var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
-    defer grid.deinit();
+test "Hunt and Kill on all types" {
+    const tst = struct {
+        fn tst(comptime T: type) !void {
+            var alloc = std.testing.allocator;
+            var grid = try T.init(alloc, 0, 10, 10);
+            defer grid.deinit();
+            try HuntAndKill.on(&grid);
+        }
+    }.tst;
 
-    _ = try HuntAndKill.on(&grid);
+    inline for (@import("mazes.zig").AllMazes) |t| try tst(t);
 }
 
 test "HuntAndKill produces expected maze texture" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try HuntAndKill.on(&grid);
@@ -88,12 +95,12 @@ test "HuntAndKill produces expected maze texture" {
 
 test "HuntAndKill distances" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try HuntAndKill.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -128,12 +135,12 @@ test "HuntAndKill distances" {
 
 test "HuntAndKill path" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try HuntAndKill.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

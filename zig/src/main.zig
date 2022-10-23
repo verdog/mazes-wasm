@@ -214,7 +214,7 @@ pub fn main() !void {
 
 fn dispatch(opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
     switch (opt.grid) {
-        .square => return try run(maze.Grid, opt, alloc),
+        .square => return try run(maze.SquareGrid, opt, alloc),
         .hex => return try run(maze.HexGrid, opt, alloc),
         .tri => return try run(maze.TriGrid, opt, alloc),
         .upsilon => return try run(maze.UpsilonGrid, opt, alloc),
@@ -230,7 +230,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     {
         std.debug.print("Generating... ", .{});
         var timer = try std.time.Timer.start();
-        try maze.onByName(Grid, &opt.@"type", &grid);
+        try maze.onByName(&opt.@"type", &grid);
         var time = timer.read();
         std.debug.print("Done ({} microseconds)\n", .{time / 1000});
     }
@@ -265,23 +265,22 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
         std.debug.print("Done ({} microseconds)\n", .{time / 1000});
     }
 
-    if (Grid == maze.Grid)
-        if (opt.viz == .path) {
-            std.debug.print("Finding longest path...", .{});
+    if (opt.viz == .path) {
+        std.debug.print("Finding longest path...", .{});
 
-            // modify distances to be longest path in maze
-            var a = grid.distances.?.max().cell;
-            var a_dists = try maze.Distances(Grid).from(&grid, a);
-            defer a_dists.deinit();
+        // modify distances to be longest path in maze
+        var a = grid.distances.?.max().cell;
+        var a_dists = try maze.Distances(Grid).from(&grid, a);
+        defer a_dists.deinit();
 
-            var b = a_dists.max().cell;
-            var a_long = try a_dists.pathTo(b);
+        var b = a_dists.max().cell;
+        var a_long = try a_dists.pathTo(b);
 
-            grid.distances.?.deinit();
-            grid.distances = a_long;
+        grid.distances.?.deinit();
+        grid.distances = a_long;
 
-            std.debug.print("Done\n", .{});
-        };
+        std.debug.print("Done\n", .{});
+    }
 
     std.debug.print("Stats:\n", .{});
 

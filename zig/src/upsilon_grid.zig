@@ -85,6 +85,26 @@ pub const UpsilonCell = struct {
         return my_neighbors[choice];
     }
 
+    pub fn randomNeighborLinked(self: UpsilonCell) ?*UpsilonCell {
+        var my_neighbors = self.neighbors();
+
+        // reduce to only those that are linked
+        var write: usize = 0;
+        var read: usize = 0;
+        while (read < my_neighbors.len and my_neighbors[read] != null) : (read += 1) {
+            if (my_neighbors[read].?.numLinks() > 0) {
+                my_neighbors[write] = my_neighbors[read];
+                write += 1;
+            }
+        }
+
+        return blk: {
+            if (write == 0) break :blk null;
+            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            break :blk my_neighbors[choice];
+        };
+    }
+
     /// return a random cell from this cell's neighbors that hasn't been linked yet
     pub fn randomNeighborUnlinked(self: UpsilonCell) ?*UpsilonCell {
         var my_neighbors = self.neighbors();
@@ -201,14 +221,16 @@ pub const UpsilonCell = struct {
         return false;
     }
 
-    neighbors_buf: [8]?*UpsilonCell = [_]?*UpsilonCell{null} ** 8,
-    linked: [8]bool = [_]bool{false} ** 8,
+    neighbors_buf: [neighbors_len]?*UpsilonCell = [_]?*UpsilonCell{null} ** neighbors_len,
+    linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
     x: u32,
     y: u32,
     weight: u32 = 1,
+
+    pub const neighbors_len = 8;
 };
 
 pub const UpsilonGrid = struct {

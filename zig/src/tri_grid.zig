@@ -76,6 +76,26 @@ pub const TriCell = struct {
         return my_neighbors[choice];
     }
 
+    pub fn randomNeighborLinked(self: TriCell) ?*TriCell {
+        var my_neighbors = self.neighbors();
+
+        // reduce to only those that are linked
+        var write: usize = 0;
+        var read: usize = 0;
+        while (read < my_neighbors.len and my_neighbors[read] != null) : (read += 1) {
+            if (my_neighbors[read].?.numLinks() > 0) {
+                my_neighbors[write] = my_neighbors[read];
+                write += 1;
+            }
+        }
+
+        return blk: {
+            if (write == 0) break :blk null;
+            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            break :blk my_neighbors[choice];
+        };
+    }
+
     /// return a random cell from this cell's neighbors that hasn't been linked yet
     pub fn randomNeighborUnlinked(self: TriCell) ?*TriCell {
         var my_neighbors = self.neighbors();
@@ -196,15 +216,17 @@ pub const TriCell = struct {
     /// 0: north or south   / \   \--0--/
     /// 1: east            /2 1\   \2 1/
     /// 2: west           /__0__\   \ /
-    neighbors_buf: [3]?*TriCell = [_]?*TriCell{null} ** 3,
+    neighbors_buf: [neighbors_len]?*TriCell = [_]?*TriCell{null} ** neighbors_len,
     /// maps to neighbors in neighbors_buf
-    linked: [3]bool = [_]bool{false} ** 3,
+    linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
     x: u32,
     y: u32,
     weight: u32 = 1,
+
+    pub const neighbors_len = 3;
 };
 
 pub const TriGrid = struct {

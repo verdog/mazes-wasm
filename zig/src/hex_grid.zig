@@ -159,6 +159,26 @@ pub const HexCell = struct {
         return my_neighbors[choice];
     }
 
+    pub fn randomNeighborLinked(self: HexCell) ?*HexCell {
+        var my_neighbors = self.neighbors();
+
+        // reduce to only those that are not linked
+        var write: usize = 0;
+        var read: usize = 0;
+        while (read < my_neighbors.len and my_neighbors[read] != null) : (read += 1) {
+            if (my_neighbors[read].?.numLinks() > 0) {
+                my_neighbors[write] = my_neighbors[read];
+                write += 1;
+            }
+        }
+
+        return blk: {
+            if (write == 0) break :blk null;
+            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            break :blk my_neighbors[choice];
+        };
+    }
+
     /// return a random cell from this cell's neighbors that hasn't been linked yet
     pub fn randomNeighborUnlinked(self: HexCell) ?*HexCell {
         var my_neighbors = self.neighbors();
@@ -265,15 +285,17 @@ pub const HexCell = struct {
     /// 3: south              \             /
     /// 4: southwest           \4         2/
     /// 5: northwest            \____3____/
-    neighbors_buf: [6]?*HexCell = [_]?*HexCell{null} ** 6,
+    neighbors_buf: [neighbors_len]?*HexCell = [_]?*HexCell{null} ** neighbors_len,
     // `linked[i]` is true if this cell is linked to `neighbors[i]`
-    linked: [6]bool = [_]bool{false} ** 6,
+    linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
     x: u32,
     y: u32,
     weight: u32 = 1,
+
+    pub const neighbors_len = 6;
 };
 
 pub const HexGrid = struct {

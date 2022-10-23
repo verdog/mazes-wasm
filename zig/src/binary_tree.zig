@@ -2,22 +2,22 @@
 
 const std = @import("std");
 
-const Grid = @import("grid.zig").Grid;
+const SquareGrid = @import("square_grid.zig").SquareGrid;
 const Distances = @import("distances.zig").Distances;
-const Cell = @import("grid.zig").Cell;
+const SquareCell = @import("square_grid.zig").SquareCell;
 
 const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
 pub const BinaryTree = struct {
     /// apply the binary tree maze algorithm to `grid` using random `seed`.
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: *SquareGrid) !void {
         const random = grid.prng.random();
 
         for (grid.cells_buf) |*cell| {
             // Of the cell's north and east neighbors, if it has them at all,
             // pick a random cell from the two and link it.
-            var candidates: [2]?*Cell = .{ cell.north(), cell.east() };
+            var candidates: [2]?*SquareCell = .{ cell.north(), cell.east() };
             var non_null: u2 = 0;
             for (candidates) |ptr| {
                 if (ptr != null) non_null += 1;
@@ -44,7 +44,7 @@ pub const BinaryTree = struct {
 
 test "Apply BinaryTree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     _ = try BinaryTree.on(&grid);
@@ -52,7 +52,7 @@ test "Apply BinaryTree" {
 
 test "Binary tree works as expected" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 777, 12, 12);
+    var grid = try SquareGrid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
     try BinaryTree.on(&grid);
@@ -94,12 +94,12 @@ test "Binary tree works as expected" {
 
 test "Distances after binary tree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 777, 12, 12);
+    var grid = try SquareGrid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
 
     var s = try grid.makeString();
     defer alloc.free(s);
@@ -138,12 +138,12 @@ test "Distances after binary tree" {
 
 test "Path after binary tree" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 777, 12, 12);
+    var grid = try SquareGrid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
     try BinaryTree.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(0, 11).?);
     grid.distances.?.deinit();
     grid.distances = path;

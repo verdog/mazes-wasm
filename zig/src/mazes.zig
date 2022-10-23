@@ -1,12 +1,3 @@
-pub const Grid = @import("grid.zig").Grid;
-pub const Cell = @import("grid.zig").Cell;
-pub const HexGrid = @import("hex_grid.zig").HexGrid;
-pub const HexCell = @import("hex_grid.zig").HexCell;
-pub const TriGrid = @import("tri_grid.zig").TriGrid;
-pub const TriCell = @import("tri_grid.zig").TriCell;
-pub const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
-pub const UpsilonCell = @import("upsilon_grid.zig").UpsilonCell;
-
 pub const Distances = @import("distances.zig").Distances;
 
 pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
@@ -19,63 +10,50 @@ pub const RecursiveBacktracker = @import("recursive_backtracker.zig").RecursiveB
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
+pub const SquareGrid = @import("square_grid.zig").SquareGrid;
+pub const HexGrid = @import("hex_grid.zig").HexGrid;
+pub const TriGrid = @import("tri_grid.zig").TriGrid;
+pub const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
+
+pub const AllMazes = [_]type{ SquareGrid, HexGrid, TriGrid, UpsilonGrid };
+
 const std = @import("std");
 
 pub const Error = error{
     NoSuchMaze,
 };
 
-pub fn gridSupports(comptime GT: type, op: []const u8) bool {
-    const decls = @typeInfo(GT).Struct.decls;
-    inline for (decls) |f| {
-        if (std.mem.eql(u8, f.name, op))
-            return true;
-    }
-    return false;
-}
-
-pub fn onByName(comptime GridType: type, name: []const u8, grid: *GridType) !void {
+pub fn onByName(name: []const u8, grid: anytype) !void {
     const eq = @import("std").mem.startsWith;
 
-    switch (GridType) {
-        Grid => {
-            if (eq(u8, name, "None")) return;
-            if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
-            if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
-            if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
-            if (eq(u8, name, "Wilson")) return try Wilson.on(grid);
-            if (eq(u8, name, "Fast")) return try Fast.on(grid);
-            if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
-            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-        },
-        HexGrid => {
-            if (eq(u8, name, "None")) return;
-            if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
-            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-        },
-        TriGrid => {
-            if (eq(u8, name, "None")) return;
-            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-        },
-        UpsilonGrid => {
-            if (eq(u8, name, "None")) return;
-            if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
-        },
-        else => return Error.NoSuchMaze,
+    if (@TypeOf(grid) == *SquareGrid) {
+        if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
+        if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
     }
+
+    if (eq(u8, name, "None")) return;
+    if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
+    if (eq(u8, name, "Wilson")) return try Wilson.on(grid);
+    if (eq(u8, name, "Fast")) return try Fast.on(grid);
+    if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
+    if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+
+    return Error.NoSuchMaze;
 }
 
+// TODO fix these up
 pub fn makeString(comptime GridT: type, grid: *GridT) anyerror![]u8 {
     switch (GridT) {
-        Grid => return try grid.makeString(),
+        SquareGrid => return try grid.makeString(),
         HexGrid => return try @import("hex_grid.zig").makeString(grid),
         else => return Error.NoSuchMaze,
     }
 }
 
+// TODO fix these up
 pub fn makeQanvas(grid: anytype, walls: bool, scale: usize) !Qanvas {
     switch (@TypeOf(grid)) {
-        Grid => return try grid.makeQanvas(walls, scale),
+        SquareGrid => return try grid.makeQanvas(walls, scale),
         HexGrid => return try @import("hex_grid.zig").makeQanvas(grid, walls, scale),
         TriGrid => return try @import("tri_grid.zig").makeQanvas(grid, walls, scale),
         UpsilonGrid => return try @import("upsilon_grid.zig").makeQanvas(grid, walls, scale),
@@ -85,7 +63,7 @@ pub fn makeQanvas(grid: anytype, walls: bool, scale: usize) !Qanvas {
 
 test "Test mazes" {
     // grids
-    _ = @import("grid.zig");
+    _ = @import("square_grid.zig");
     _ = @import("hex_grid.zig");
     _ = @import("tri_grid.zig");
     _ = @import("upsilon_grid.zig");
@@ -101,9 +79,6 @@ test "Test mazes" {
     _ = @import("hunt_and_kill.zig");
     _ = @import("recursive_backtracker.zig");
 }
-
-// api requirements for a grid
-const test_types = [_]type{ Grid, HexGrid, TriGrid, UpsilonGrid };
 
 fn test_getGrid(comptime GridT: type) !GridT {
     const alctr = std.testing.allocator;
@@ -125,7 +100,7 @@ test "grid api: create/destroy" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: size" {
@@ -144,7 +119,7 @@ test "grid api: size" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: at" {
@@ -163,7 +138,7 @@ test "grid api: at" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: pickRandom" {
@@ -180,7 +155,7 @@ test "grid api: pickRandom" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: cells don't blow up when making random choices" {
@@ -202,7 +177,7 @@ test "grid api: cells don't blow up when making random choices" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: deadends" {
@@ -216,8 +191,8 @@ test "grid api: deadends" {
                 // a dead end is defined as a cell with one link.
                 // un-mazified grids should have no dead ends.
                 const des = try g.deadends();
-
                 defer g.alctr.free(des);
+
                 try std.testing.expect(des.len == 0);
             }
 
@@ -255,7 +230,7 @@ test "grid api: deadends" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "grid api: braid" {
@@ -291,10 +266,10 @@ test "grid api: braid" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
-test "cell api" {
+test "cell api: Grid has CellT" {
     const tst = struct {
         fn tst(comptime GridT: type) !void {
             const CellT = GridT.CellT;
@@ -302,7 +277,7 @@ test "cell api" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: construct/destruct" {
@@ -318,7 +293,7 @@ test "cell api: construct/destruct" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: bLink" {
@@ -341,7 +316,7 @@ test "cell api: bLink" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: unLink" {
@@ -369,7 +344,7 @@ test "cell api: unLink" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: links" {
@@ -388,14 +363,14 @@ test "cell api: links" {
 
             var count: usize = 0;
             for (g.at(1, 1).?.links()) |mlink| {
-                if (mlink) |_| count += 1;
+                if (mlink != null) count += 1;
             }
 
             try std.testing.expectEqual(@as(@TypeOf(count), 3), count);
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: neighbors" {
@@ -403,9 +378,7 @@ test "cell api: neighbors" {
         fn countNonNullNeighbors(cell: anytype) u32 {
             var count: u32 = 0;
             for (cell.neighbors()) |mnei| {
-                if (mnei != null) {
-                    count += 1;
-                }
+                if (mnei != null) count += 1;
             }
             return count;
         }
@@ -416,7 +389,7 @@ test "cell api: neighbors" {
             errdefer std.debug.print("failing type: {}\n", .{GridT});
 
             switch (GridT.CellT) {
-                Grid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 4),
+                SquareGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 4),
                 HexGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 6),
                 TriGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 3),
                 UpsilonGrid.CellT => {
@@ -428,7 +401,7 @@ test "cell api: neighbors" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: randomLink" {
@@ -451,7 +424,7 @@ test "cell api: randomLink" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }
 
 test "cell api: randomNeighbor" {
@@ -465,5 +438,5 @@ test "cell api: randomNeighbor" {
         }
     }.tst;
 
-    inline for (test_types) |t| try tst(t);
+    inline for (AllMazes) |t| try tst(t);
 }

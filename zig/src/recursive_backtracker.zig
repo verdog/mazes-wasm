@@ -2,8 +2,8 @@
 
 const std = @import("std");
 
-const Grid = @import("grid.zig").Grid;
-const Cell = @import("grid.zig").Cell;
+const SquareGrid = @import("square_grid.zig").SquareGrid;
+const SquareCell = @import("square_grid.zig").SquareCell;
 const Distances = @import("distances.zig").Distances;
 const HexGrid = @import("hex_grid.zig").HexGrid;
 const HexCell = @import("hex_grid.zig").HexCell;
@@ -15,7 +15,7 @@ const UpsilonCell = @import("upsilon_grid.zig").UpsilonCell;
 pub const RecursiveBacktracker = struct {
     pub fn on(grid: anytype) !void {
         switch (@TypeOf(grid)) {
-            *Grid => return try RecursiveBacktracker.on_Grid(grid),
+            *SquareGrid => return try RecursiveBacktracker.on_Grid(grid),
             *HexGrid => return try RecursiveBacktracker.on_Generic(HexGrid, HexCell, grid),
             *TriGrid => return try RecursiveBacktracker.on_Generic(TriGrid, TriCell, grid),
             *UpsilonGrid => return try RecursiveBacktracker.on_Generic(UpsilonGrid, UpsilonCell, grid),
@@ -23,8 +23,8 @@ pub const RecursiveBacktracker = struct {
         }
     }
 
-    fn on_Grid(grid: *Grid) !void {
-        var stack = std.ArrayList(*Cell).init(grid.alctr);
+    fn on_Grid(grid: *SquareGrid) !void {
+        var stack = std.ArrayList(*SquareCell).init(grid.alctr);
         defer stack.deinit();
 
         try stack.append(grid.pickRandom());
@@ -58,17 +58,22 @@ pub const RecursiveBacktracker = struct {
     }
 };
 
-test "Apply RecursiveBacktracker" {
-    var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
-    defer grid.deinit();
+test "Apply RecursiveBacktracker to all types" {
+    const tst = struct {
+        fn tst(comptime T: type) !void {
+            var alloc = std.testing.allocator;
+            var grid = try T.init(alloc, 0, 10, 10);
+            defer grid.deinit();
+            try RecursiveBacktracker.on(&grid);
+        }
+    }.tst;
 
-    try RecursiveBacktracker.on(&grid);
+    inline for (@import("mazes.zig").AllMazes) |t| try tst(t);
 }
 
 test "RecursiveBacktracker produces expected maze texture" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try RecursiveBacktracker.on(&grid);
@@ -106,12 +111,12 @@ test "RecursiveBacktracker produces expected maze texture" {
 
 test "RecursiveBacktracker distances" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -146,12 +151,12 @@ test "RecursiveBacktracker distances" {
 
 test "RecursiveBacktracker path" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try RecursiveBacktracker.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

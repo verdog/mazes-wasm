@@ -11,9 +11,9 @@ const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
 /// a single maze Cell
-pub const Cell = struct {
-    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, y: u32, x: u32) Cell {
-        return Cell{
+pub const SquareCell = struct {
+    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, y: u32, x: u32) SquareCell {
+        return SquareCell{
             .y = y,
             .x = x,
             .prng = prng,
@@ -21,20 +21,20 @@ pub const Cell = struct {
         };
     }
 
-    pub fn deinit(self: *Cell) void {
+    pub fn deinit(self: *SquareCell) void {
         _ = self;
     }
 
     /// bidirectional link
     /// self <---> other
-    pub fn bLink(self: *Cell, other: *Cell) !void {
+    pub fn bLink(self: *SquareCell, other: *SquareCell) !void {
         try self.mLink(other);
         try other.mLink(self);
     }
 
     /// monodirectional link
     /// self ----> other
-    pub fn mLink(self: *Cell, other: *Cell) !void {
+    pub fn mLink(self: *SquareCell, other: *SquareCell) !void {
         if (self.whichNeighbor(other.*)) |i| {
             self.linked[i] = true;
             return;
@@ -43,18 +43,18 @@ pub const Cell = struct {
     }
 
     /// unlink `self` from `other` in both directions
-    pub fn unLink(self: *Cell, other: *Cell) void {
+    pub fn unLink(self: *SquareCell, other: *SquareCell) void {
         self.mUnLink(other);
         other.mUnLink(self);
     }
 
     // monodirectional unlink
-    fn mUnLink(self: *Cell, other: *Cell) void {
+    fn mUnLink(self: *SquareCell, other: *SquareCell) void {
         // no-ops are fine
         if (self.whichNeighbor(other.*)) |i| self.linked[i] = false;
     }
 
-    fn whichNeighbor(self: Cell, other: Cell) ?u8 {
+    fn whichNeighbor(self: SquareCell, other: SquareCell) ?u8 {
         if (self.x == other.x and self.y -% other.y == 1) return 0; // north
         if (self.x == other.x and other.y -% self.y == 1) return 1; // south
         if (self.y == other.y and other.x -% self.x == 1) return 2; // east
@@ -63,27 +63,27 @@ pub const Cell = struct {
     }
 
     /// return true if `self` is linked to `other`
-    pub fn isLinked(self: Cell, other: *Cell) bool {
+    pub fn isLinked(self: SquareCell, other: *SquareCell) bool {
         if (self.whichNeighbor(other.*)) |i| return self.linked[i];
         return false;
     }
 
     /// return the number of cells this cell is linked to
-    pub fn numLinks(self: Cell) u32 {
+    pub fn numLinks(self: SquareCell) u32 {
         return @intCast(u32, std.mem.count(bool, &self.linked, &.{true}));
     }
 
     /// return an iterator over cells that `self` is linked to.
-    pub fn links(self: Cell) [4]?*Cell {
+    pub fn links(self: SquareCell) [4]?*SquareCell {
         return self.getNeighbors(true);
     }
 
     /// return a random cell from the cells that are linked to this cell
-    pub fn randomLink(self: Cell) ?*Cell {
+    pub fn randomLink(self: SquareCell) ?*SquareCell {
         // XXX: Assumes the maximum amount of links a cell can have is 4
         const max_links = 4;
         var actual_links: u8 = 0;
-        var potential_links = [_]?*Cell{null} ** max_links;
+        var potential_links = [_]?*SquareCell{null} ** max_links;
 
         for (self.links()) |mlink| {
             if (mlink) |nei| {
@@ -101,8 +101,8 @@ pub const Cell = struct {
         }
     }
 
-    fn getNeighbors(self: Cell, require_linked: bool) [4]?*Cell {
-        var result = [_]?*Cell{null} ** 4;
+    fn getNeighbors(self: SquareCell, require_linked: bool) [4]?*SquareCell {
+        var result = [_]?*SquareCell{null} ** 4;
         var i: usize = 0;
         for (self.neighbors_buf) |mnei| {
             if (mnei) |nei| {
@@ -117,12 +117,12 @@ pub const Cell = struct {
 
     /// return an iterator over cells that are orthogonal to `self`.
     /// returned cells need not be actually linked to `self`.
-    pub fn neighbors(self: *Cell) [4]?*Cell {
+    pub fn neighbors(self: *SquareCell) [4]?*SquareCell {
         return self.getNeighbors(false);
     }
 
     /// return a random cell from the cells that are orthogonal to this cell
-    pub fn randomNeighbor(self: *Cell) ?*Cell {
+    pub fn randomNeighbor(self: *SquareCell) ?*SquareCell {
         var neis_buf = self.neighbors();
 
         var neis = std.mem.sliceTo(&neis_buf, null);
@@ -137,9 +137,9 @@ pub const Cell = struct {
 
     /// return a random cell from the cells that are orthogonal to this cell
     /// and don't have a link to any other cell
-    pub fn randomNeighborUnlinked(self: *Cell) ?*Cell {
+    pub fn randomNeighborUnlinked(self: *SquareCell) ?*SquareCell {
         // XXX: Assumes the maximum amount of neighbors a cell can have is 4
-        var potential_neighbors_buf = [_]*Cell{undefined} ** 32;
+        var potential_neighbors_buf = [_]*SquareCell{undefined} ** 32;
         var actual_neighbors: usize = 0;
 
         var neis = self.neighbors();
@@ -164,9 +164,9 @@ pub const Cell = struct {
 
     /// return a random cell from the cells that are orthogonal to this cell
     /// and do have a link to any other cell
-    pub fn randomNeighborLinked(self: *Cell) ?*Cell {
+    pub fn randomNeighborLinked(self: *SquareCell) ?*SquareCell {
         // XXX: Assumes the maximum amount of neighbors a cell can have is 4
-        var potential_neighbors_buf = [_]*Cell{undefined} ** 32;
+        var potential_neighbors_buf = [_]*SquareCell{undefined} ** 32;
         var actual_neighbors: usize = 0;
 
         var neis = self.neighbors();
@@ -189,19 +189,19 @@ pub const Cell = struct {
         }
     }
 
-    pub fn north(self: Cell) ?*Cell {
+    pub fn north(self: SquareCell) ?*SquareCell {
         return self.neighbors_buf[0];
     }
 
-    pub fn south(self: Cell) ?*Cell {
+    pub fn south(self: SquareCell) ?*SquareCell {
         return self.neighbors_buf[1];
     }
 
-    pub fn east(self: Cell) ?*Cell {
+    pub fn east(self: SquareCell) ?*SquareCell {
         return self.neighbors_buf[2];
     }
 
-    pub fn west(self: Cell) ?*Cell {
+    pub fn west(self: SquareCell) ?*SquareCell {
         return self.neighbors_buf[3];
     }
 
@@ -213,24 +213,25 @@ pub const Cell = struct {
     prng: *std.rand.DefaultPrng,
 
     // north, south, east, west
-    neighbors_buf: [4]?*Cell = [_]?*Cell{null} ** 4,
+    neighbors_buf: [neighbors_len]?*SquareCell = [_]?*SquareCell{null} ** neighbors_len,
     // linked[i] is true is this cell is linked to neighbors_buf[i]
-    linked: [4]bool = [_]bool{false} ** 4,
+    linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
+    pub const neighbors_len = 4;
 };
 
-pub const Grid = struct {
+pub const SquareGrid = struct {
     width: u32,
     height: u32,
-    cells_buf: []Cell = undefined,
-    distances: ?Distances(Grid) = null,
+    cells_buf: []SquareCell = undefined,
+    distances: ?Distances(SquareGrid) = null,
 
     alctr: Allocator,
     prng: *std.rand.DefaultPrng,
 
-    pub const CellT = Cell;
+    pub const CellT = SquareCell;
 
-    pub fn init(alctr: Allocator, seed: u64, w: u32, h: u32) !Grid {
-        var g = Grid{
+    pub fn init(alctr: Allocator, seed: u64, w: u32, h: u32) !SquareGrid {
+        var g = SquareGrid{
             .width = w,
             .height = h,
             .alctr = alctr,
@@ -245,7 +246,7 @@ pub const Grid = struct {
         return g;
     }
 
-    pub fn deinit(self: *Grid) void {
+    pub fn deinit(self: *SquareGrid) void {
         for (self.cells_buf) |*cell| {
             cell.*.deinit();
         }
@@ -255,7 +256,7 @@ pub const Grid = struct {
     }
 
     /// return cell at given coordinates. null if it doesn't exist.
-    pub fn at(self: *Grid, x: u32, y: u32) ?*Cell {
+    pub fn at(self: *SquareGrid, x: u32, y: u32) ?*SquareCell {
         if (x < 0) return null;
         if (x >= self.width) return null;
         if (y < 0) return null;
@@ -264,15 +265,15 @@ pub const Grid = struct {
     }
 
     /// return a random cell in the grid
-    pub fn pickRandom(self: *Grid) *Cell {
+    pub fn pickRandom(self: *SquareGrid) *SquareCell {
         var i = self.prng.random().intRangeAtMost(usize, 0, self.size() - 1);
         return &self.cells_buf[i];
     }
 
     /// return a list of every cell that is only connected to one other cell.
     /// caller should free the returned list.
-    pub fn deadends(self: *Grid) ![]*Cell {
-        var list = std.ArrayList(*Cell).init(self.alctr);
+    pub fn deadends(self: *SquareGrid) ![]*SquareCell {
+        var list = std.ArrayList(*SquareCell).init(self.alctr);
         defer list.deinit();
 
         for (self.cells_buf) |*cell| {
@@ -286,18 +287,18 @@ pub const Grid = struct {
 
     /// remove dead ends. p is a number betweein 0.0 and 1.0 and is the
     /// probability that a dead end will be removed.
-    pub fn braid(self: *Grid, p: f64) !void {
+    pub fn braid(self: *SquareGrid, p: f64) !void {
         var ddends = try self.deadends();
         defer self.alctr.free(ddends);
 
-        self.prng.random().shuffle(*Cell, ddends);
+        self.prng.random().shuffle(*SquareCell, ddends);
 
         for (ddends) |cell| {
             const pick = self.prng.random().float(f64);
             if (pick > p or cell.numLinks() != 1) continue;
 
             // filter out already linked
-            var unlinked_buf = [_]?*Cell{null} ** 4;
+            var unlinked_buf = [_]?*SquareCell{null} ** 4;
             var ulen: usize = 0;
             for (cell.neighbors()) |mnei| {
                 if (mnei) |nei| {
@@ -310,7 +311,7 @@ pub const Grid = struct {
             var unlinked = unlinked_buf[0..ulen];
 
             // prefer linked two dead ends together. it looks nice
-            var best_buf = [_]?*Cell{null} ** 4;
+            var best_buf = [_]?*SquareCell{null} ** 4;
             var blen: usize = 0;
             for (unlinked) |unei| {
                 if (unei.?.numLinks() == 1) {
@@ -320,7 +321,7 @@ pub const Grid = struct {
             }
             var best = best_buf[0..blen];
 
-            var pool: *[]?*Cell = if (best.len > 0) &best else &unlinked;
+            var pool: *[]?*SquareCell = if (best.len > 0) &best else &unlinked;
 
             var choice_i = self.prng.random().intRangeLessThan(usize, 0, pool.len);
             var choice = pool.*[choice_i];
@@ -329,20 +330,20 @@ pub const Grid = struct {
     }
 
     /// return the amount of cells in the grid
-    pub fn size(self: Grid) usize {
+    pub fn size(self: SquareGrid) usize {
         return self.width *| self.height;
     }
 
-    fn prepareGrid(self: *Grid) !void {
-        self.cells_buf = try self.alctr.alloc(Cell, self.width * self.height);
+    fn prepareGrid(self: *SquareGrid) !void {
+        self.cells_buf = try self.alctr.alloc(SquareCell, self.width * self.height);
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = Cell.init(self.alctr, self.prng, y, x);
+            cell.* = SquareCell.init(self.alctr, self.prng, y, x);
         }
     }
 
-    fn configureCells(self: *Grid) void {
+    fn configureCells(self: *SquareGrid) void {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
@@ -359,7 +360,7 @@ pub const Grid = struct {
         i.* += word.len;
     }
 
-    fn contentsOf(self: Grid, cell: *Cell) u8 {
+    fn contentsOf(self: SquareGrid, cell: *SquareCell) u8 {
         const contents = "0123456789ABCDEF";
         if (self.distances) |distances| {
             if (distances.get(cell)) |dist| {
@@ -373,7 +374,7 @@ pub const Grid = struct {
     /// memory for the string will be allocated with
     /// the allocator that the grid was initialized with.
     /// TODO test performance
-    pub fn makeString(self: Grid) ![]u8 {
+    pub fn makeString(self: SquareGrid) ![]u8 {
         // the output will have a top row of +---+,
         // followed by a grid that takes up 2 rows
         // per grid row.
@@ -428,7 +429,7 @@ pub const Grid = struct {
     /// return a representation of the grid encoded as a qoi image.
     /// memory for the returned buffer is allocated by the allocator
     /// that the grid was initialized with.
-    pub fn makeQanvas(self: Grid, walls: bool, scale: usize) !qan.Qanvas {
+    pub fn makeQanvas(self: SquareGrid, walls: bool, scale: usize) !qan.Qanvas {
         const cell_size = @intCast(u32, scale);
         const border_size = cell_size / 2;
 
@@ -492,7 +493,7 @@ pub const Grid = struct {
 
 test "Grid.makeString() returns a perfect, closed grid before modification" {
     var alloc = std.testing.allocator;
-    var g = try Grid.init(alloc, 0, 5, 5);
+    var g = try SquareGrid.init(alloc, 0, 5, 5);
     defer g.deinit();
 
     var s = try g.makeString();

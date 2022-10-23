@@ -2,12 +2,13 @@
 
 const std = @import("std");
 
-const Grid = @import("grid.zig").Grid;
-const Cell = @import("grid.zig").Cell;
 const Distances = @import("distances.zig").Distances;
 
 pub const Wilson = struct {
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: anytype) !void {
+        comptime if (@typeInfo(@TypeOf(grid)) != .Pointer)
+            @compileError("Must pass pointer");
+
         var visited = try grid.alctr.alloc(bool, grid.size());
         defer grid.alctr.free(visited);
 
@@ -20,7 +21,8 @@ pub const Wilson = struct {
         }
 
         // generate
-        var path = std.ArrayList(*Cell).init(grid.alctr);
+        const CellT = @typeInfo(@TypeOf(grid)).Pointer.child.CellT;
+        var path = std.ArrayList(*CellT).init(grid.alctr);
         defer path.deinit();
         var search: usize = 0;
 
@@ -34,7 +36,7 @@ pub const Wilson = struct {
             // wander until we find an unvisited cell
             while (visited[cell.y * grid.width + cell.x] == false) {
                 cell = cell.randomNeighbor().?;
-                if (std.mem.indexOfScalar(*Cell, path.items, cell)) |visited_idx| {
+                if (std.mem.indexOfScalar(*CellT, path.items, cell)) |visited_idx| {
                     path.shrinkRetainingCapacity(visited_idx + 1);
                 } else {
                     try path.append(cell);
@@ -52,17 +54,24 @@ pub const Wilson = struct {
     }
 };
 
-test "Apply Wilson" {
-    var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
-    defer grid.deinit();
+const SquareGrid = @import("square_grid.zig").SquareGrid;
 
-    try Wilson.on(&grid);
+test "Apply Wilson to all types" {
+    const tst = struct {
+        fn tst(comptime T: type) !void {
+            var alloc = std.testing.allocator;
+            var grid = try T.init(alloc, 0, 10, 10);
+            defer grid.deinit();
+            try Wilson.on(&grid);
+        }
+    }.tst;
+
+    inline for (@import("mazes.zig").AllMazes) |t| try tst(t);
 }
 
 test "Wilson produces expected maze texture" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try Wilson.on(&grid);
@@ -100,12 +109,12 @@ test "Wilson produces expected maze texture" {
 
 test "Wilson distances" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try Wilson.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
 
     const s = try grid.makeString();
     defer alloc.free(s);
@@ -140,12 +149,12 @@ test "Wilson distances" {
 
 test "Aldous broder path" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     try Wilson.on(&grid);
 
-    grid.distances = try Distances(Grid).from(&grid, grid.at(0, 0).?);
+    grid.distances = try Distances(SquareGrid).from(&grid, grid.at(0, 0).?);
     var path = try grid.distances.?.pathTo(grid.at(9, 9).?);
     grid.distances.?.deinit();
     grid.distances = path;

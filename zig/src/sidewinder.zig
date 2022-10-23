@@ -1,16 +1,19 @@
 //! sidewinder maze algorithm
 const std = @import("std");
 
-const Grid = @import("grid.zig").Grid;
-const Cell = @import("grid.zig").Cell;
+const SquareGrid = @import("square_grid.zig").SquareGrid;
 const expect = std.testing.expect;
 const expectEq = std.testing.expectEqual;
 
 pub const Sidewinder = struct {
-    pub fn on(grid: *Grid) !void {
+    pub fn on(grid: anytype) !void {
+        comptime if (@typeInfo(@TypeOf(grid)) != .Pointer)
+            @compileError("Must pass pointer");
+        const CellT = @typeInfo(@TypeOf(grid)).Pointer.child.CellT;
+
         const random = grid.prng.random();
 
-        var run = try grid.alctr.alloc(?*Cell, grid.width);
+        var run = try grid.alctr.alloc(?*CellT, grid.width);
         defer grid.alctr.free(run);
 
         var run_len: usize = 0;
@@ -39,7 +42,7 @@ pub const Sidewinder = struct {
 
 test "Construct and desruct sidewinder" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 0, 10, 10);
+    var grid = try SquareGrid.init(alloc, 0, 10, 10);
     defer grid.deinit();
 
     _ = try Sidewinder.on(&grid);
@@ -47,7 +50,7 @@ test "Construct and desruct sidewinder" {
 
 test "Sidewinder works" {
     var alloc = std.testing.allocator;
-    var grid = try Grid.init(alloc, 777, 12, 12);
+    var grid = try SquareGrid.init(alloc, 777, 12, 12);
     defer grid.deinit();
 
     try Sidewinder.on(&grid);
