@@ -17,6 +17,7 @@ const Options = struct {
     width: u32 = 8,
     height: u32 = 8,
     scale: usize = 8,
+    inset: f64 = 0,
     @"type": [64]u8 = u.strBuf(64, "RecursiveBacktracker"),
     viz: Vizualization = .heat,
     grid: Grid = .square,
@@ -72,6 +73,10 @@ const Options = struct {
                         if (it.next()) |right| {
                             opts.scale = try std.fmt.parseUnsigned(@TypeOf(opts.scale), right, 10);
                         }
+                    } else if (eq(u8, "--inset", left)) {
+                        if (it.next()) |right| {
+                            opts.inset = try std.fmt.parseFloat(@TypeOf(opts.inset), right);
+                        }
                     } else if (eq(u8, "--braid", left)) {
                         if (it.next()) |right| {
                             opts.braid = try std.fmt.parseFloat(@TypeOf(opts.braid), right);
@@ -123,6 +128,7 @@ const Options = struct {
             \\ - width: {d}
             \\ - height: {d}
             \\ - scale: {d}
+            \\ - inset: {d}
             \\ - type: {s}
             \\ - viz: {s}
             \\ - grid: {s}
@@ -136,6 +142,7 @@ const Options = struct {
             opt.width,
             opt.height,
             opt.scale,
+            opt.inset,
             std.mem.sliceTo(&opt.@"type", 0),
             u.eString(Options.Vizualization, opt.viz),
             u.eString(Options.Grid, opt.grid),
@@ -302,7 +309,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     {
         std.debug.print("Encoding image... ", .{});
         var timer = try std.time.Timer.start();
-        var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale);
+        var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale, opt.inset);
         var time = timer.read();
         std.debug.print("Done ({} microseconds)\n", .{time / 1000});
 

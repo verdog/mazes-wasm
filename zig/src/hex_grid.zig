@@ -835,9 +835,9 @@ test "Hex grid oob" {
     var grid = try HexGrid.init(alloc, 0, 8, 8);
     defer grid.deinit();
 
-    try std.testing.expectEqual(null, grid.at(8, 8));
-    try std.testing.expectEqual(null, grid.at(0, 8));
-    try std.testing.expectEqual(null, grid.at(8, 0));
+    try std.testing.expectEqual(@as(?*HexGrid.CellT, null), grid.at(8, 8));
+    try std.testing.expectEqual(@as(?*HexGrid.CellT, null), grid.at(0, 8));
+    try std.testing.expectEqual(@as(?*HexGrid.CellT, null), grid.at(8, 0));
 }
 
 test "Hex grid string" {

@@ -51,9 +51,9 @@ pub fn makeString(comptime GridT: type, grid: *GridT) anyerror![]u8 {
 }
 
 // TODO fix these up
-pub fn makeQanvas(grid: anytype, walls: bool, scale: usize) !Qanvas {
+pub fn makeQanvas(grid: anytype, walls: bool, scale: usize, inset: f64) !Qanvas {
     switch (@TypeOf(grid)) {
-        SquareGrid => return try grid.makeQanvas(walls, scale),
+        SquareGrid => return try grid.makeQanvas(walls, scale, inset),
         HexGrid => return try @import("hex_grid.zig").makeQanvas(grid, walls, scale),
         TriGrid => return try @import("tri_grid.zig").makeQanvas(grid, walls, scale),
         UpsilonGrid => return try @import("upsilon_grid.zig").makeQanvas(grid, walls, scale),

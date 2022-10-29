@@ -426,10 +426,7 @@ pub const SquareGrid = struct {
         return ret;
     }
 
-    /// return a representation of the grid encoded as a qoi image.
-    /// memory for the returned buffer is allocated by the allocator
-    /// that the grid was initialized with.
-    pub fn makeQanvas(self: SquareGrid, walls: bool, scale: usize) !qan.Qanvas {
+    fn makeQanvasNoInset(self: SquareGrid, walls: bool, scale: usize) !qan.Qanvas {
         const cell_size = @intCast(u32, scale);
         const border_size = cell_size / 2;
 
@@ -437,9 +434,6 @@ pub const SquareGrid = struct {
         const height = self.height * cell_size;
 
         var qanv = try qan.Qanvas.init(self.alctr, width + border_size * 2, height + border_size * 2);
-
-        // white
-        // const background: qoi.Qixel = .{ .red = 240, .green = 240, .blue = 240 };
 
         // black
         const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
@@ -451,6 +445,7 @@ pub const SquareGrid = struct {
 
         qanv.clear(background);
 
+        // background
         for (self.cells_buf) |*cell| {
             const x1 = cell.x * cell_size + border_size;
             const x2 = (cell.x + 1) * cell_size + border_size;
@@ -466,6 +461,7 @@ pub const SquareGrid = struct {
             }
         }
 
+        // walls
         if (walls) {
             // black
             // const wall: qoi.Qixel = .{ .red = 0, .green = 0, .blue = 0 };
@@ -488,6 +484,143 @@ pub const SquareGrid = struct {
         }
 
         return qanv;
+    }
+
+    fn cellCoordsWithInset(x: u32, y: u32, cell_size: u32, inset: u32) struct {
+        // zig fmt: off
+        // y:
+        // 1_
+        // 2_. |       |_.
+        //   . |         .
+        //   . |         .
+        // 3_. |_________.
+        // 4_. .       . .
+        // x:1 2       3 4
+        //
+        // for each axis a, a1 is the first border of the cell space, a2 is the first
+        // actual wall drawn, a3 is the other wall drawn, and a4 is the other side of the
+        // cell space.
+        x1: u32, x2: u32, x3: u32, x4: u32,
+        y1: u32, y2: u32, y3: u32, y4: u32,
+    } {
+        const x1 = x;
+        const x2 = x1 + inset;
+        const x4 = x + cell_size;
+        const x3 = x4 - inset;
+        const y1 = y;
+        const y2 = y + inset;
+        const y4 = y + cell_size;
+        const y3 = y4 - inset;
+        return .{
+            .x1 = x1, .x2 = x2, .x3 = x3, .x4 = x4,
+            .y1 = y1, .y2 = y2, .y3 = y3, .y4 = y4,
+        };
+        // zig fmt: on
+    }
+
+    fn makeQanvasInset(self: SquareGrid, walls: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
+        const cell_size = @intCast(u32, scale);
+        const border_size = cell_size / 2;
+        const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
+
+        const width = self.width * cell_size;
+        const height = self.height * cell_size;
+
+        var qanv = try qan.Qanvas.init(self.alctr, width + border_size * 2, height + border_size * 2);
+
+        // black
+        const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
+        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+
+        var max = if (self.distances) |dists| dists.max() else null;
+
+        qanv.clear(background);
+
+        // background
+        for (self.cells_buf) |*cell| {
+            const x1 = cell.x * cell_size + border_size;
+            const y1 = cell.y * cell_size + border_size;
+            const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
+            if (self.distances) |dists| {
+                if (dists.get(cell)) |thedist| {
+                    // zig fmt: off
+                    const color = path_low.lerp(path_hi,
+                        @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
+                                               ).to(qoi.RGB);
+                    // zig fmt: on
+
+                    // center
+                    try qanv.fill(color, coords.x2, coords.x3, coords.y2, coords.y3);
+
+                    if (cell.north() != null and cell.isLinked(cell.north().?)) {
+                        try qanv.fill(color, coords.x2, coords.x3, coords.y1, coords.y2);
+                    }
+
+                    if (cell.south() != null and cell.isLinked(cell.south().?)) {
+                        try qanv.fill(color, coords.x2, coords.x3, coords.y3, coords.y4);
+                    }
+
+                    if (cell.east() != null and cell.isLinked(cell.east().?)) {
+                        try qanv.fill(color, coords.x3, coords.x4, coords.y2, coords.y3);
+                    }
+
+                    if (cell.west() != null and cell.isLinked(cell.west().?)) {
+                        try qanv.fill(color, coords.x1, coords.x2, coords.y2, coords.y3);
+                    }
+                }
+            }
+        }
+
+        // walls
+        if (walls) {
+            const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } };
+
+            for (self.cells_buf) |*cell| {
+                const x1 = cell.x * cell_size + border_size;
+                const y1 = cell.y * cell_size + border_size;
+                const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
+
+                if (cell.north() != null and cell.isLinked(cell.north().?)) {
+                    try qanv.line(wall, coords.x2, coords.x2, coords.y1, coords.y2);
+                    try qanv.line(wall, coords.x3, coords.x3, coords.y1, coords.y2);
+                } else {
+                    try qanv.line(wall, coords.x2, coords.x3 + 1, coords.y2, coords.y2);
+                }
+
+                if (cell.south() != null and cell.isLinked(cell.south().?)) {
+                    try qanv.line(wall, coords.x2, coords.x2, coords.y3, coords.y4);
+                    try qanv.line(wall, coords.x3, coords.x3, coords.y3, coords.y4);
+                } else {
+                    try qanv.line(wall, coords.x2, coords.x3 + 1, coords.y3, coords.y3);
+                }
+
+                if (cell.east() != null and cell.isLinked(cell.east().?)) {
+                    try qanv.line(wall, coords.x3, coords.x4, coords.y2, coords.y2);
+                    try qanv.line(wall, coords.x3, coords.x4, coords.y3, coords.y3);
+                } else {
+                    try qanv.line(wall, coords.x3, coords.x3, coords.y2, coords.y3);
+                }
+
+                if (cell.west() != null and cell.isLinked(cell.west().?)) {
+                    try qanv.line(wall, coords.x1, coords.x2, coords.y2, coords.y2);
+                    try qanv.line(wall, coords.x1, coords.x2, coords.y3, coords.y3);
+                } else {
+                    try qanv.line(wall, coords.x2, coords.x2, coords.y2, coords.y3);
+                }
+            }
+        }
+
+        return qanv;
+    }
+
+    /// return a representation of the grid encoded as a qoi image.
+    /// memory for the returned buffer is allocated by the allocator
+    /// that the grid was initialized with.
+    pub fn makeQanvas(self: SquareGrid, walls: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
+        if (inset_percent > 0) return self.makeQanvasInset(walls, scale, inset_percent);
+        return self.makeQanvasNoInset(walls, scale);
     }
 };
 
