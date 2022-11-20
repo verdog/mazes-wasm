@@ -32,6 +32,7 @@ const Options = struct {
         hex,
         tri,
         upsilon,
+        weave,
     };
 
     pub fn parse(opts: *Options, argv: anytype) !void {
@@ -225,6 +226,7 @@ fn dispatch(opt: Options, alloc: std.mem.Allocator) !qan.Qanvas {
         .hex => return try run(maze.HexGrid, opt, alloc),
         .tri => return try run(maze.TriGrid, opt, alloc),
         .upsilon => return try run(maze.UpsilonGrid, opt, alloc),
+        .weave => return try run(maze.WeaveGrid, opt, alloc),
     }
 }
 

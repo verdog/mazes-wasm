@@ -15,7 +15,7 @@ pub fn Distances(comptime GridT: type) type {
                 .grid = grid,
                 .root = root,
                 .alloc = alloc,
-                .dists = try alloc.alloc(?u32, grid.size()),
+                .dists = try alloc.alloc(?u32, grid.size() * 2),
             };
 
             for (d.dists) |*dist| dist.* = null;
@@ -25,13 +25,13 @@ pub fn Distances(comptime GridT: type) type {
 
         pub fn from(grid: *GridT, cell: *GridT.CellT) !Distances(GridT) {
             var dists = try Distances(GridT).init(grid.alctr, grid, cell);
-            try dists.put(cell, cell.weight);
+            try dists.put(cell, cell.weight());
 
             const comp = struct {
                 fn f(_: void, a: *GridT.CellT, b: *GridT.CellT) std.math.Order {
-                    if (a.weight < b.weight) return .lt;
-                    if (a.weight == b.weight) return .eq;
-                    if (a.weight > b.weight) return .gt;
+                    if (a.weight() < b.weight()) return .lt;
+                    if (a.weight() == b.weight()) return .eq;
+                    if (a.weight() > b.weight()) return .gt;
                     unreachable;
                 }
             }.f;
@@ -43,8 +43,9 @@ pub fn Distances(comptime GridT: type) type {
 
             while (frontier.count() > 0) {
                 var cellptr = frontier.remove();
+
                 for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
-                    const total_weight = dists.get(cellptr).? + c.?.weight;
+                    const total_weight = dists.get(cellptr).? + c.?.weight();
                     if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
                         try frontier.add(c.?);
                         try dists.put(c.?, total_weight);
@@ -59,12 +60,23 @@ pub fn Distances(comptime GridT: type) type {
             this.alloc.free(this.dists);
         }
 
+        fn key(this: Self, cell: *GridT.CellT) usize {
+            const k = switch (@TypeOf(cell.*)) {
+                @import("weave_grid.zig").WeaveCell => switch (cell.*) {
+                    .over => this.grid.width * cell.y() + cell.x(),
+                    .under => this.grid.size() + (this.grid.width * cell.y() + cell.x()),
+                },
+                else => this.grid.width * cell.y() + cell.x(),
+            };
+            return k;
+        }
+
         pub fn get(this: Self, cell: *GridT.CellT) ?u32 {
-            return this.dists[this.grid.width * cell.y + cell.x];
+            return this.dists[this.key(cell)];
         }
 
         pub fn put(this: *Self, cell: *GridT.CellT, dist: u32) !void {
-            this.dists[this.grid.width * cell.y + cell.x] = dist;
+            this.dists[this.key(cell)] = dist;
         }
 
         pub fn pathTo(this: Self, goal: *GridT.CellT) !Distances(GridT) {
@@ -95,8 +107,8 @@ pub fn Distances(comptime GridT: type) type {
                 if (mdist) |entry| {
                     if (entry > dist) {
                         dist = entry;
-                        const x = @intCast(u32, i % this.grid.width);
-                        const y = @intCast(u32, @divTrunc(i, this.grid.width));
+                        const x = @intCast(u32, (i % this.grid.width) % this.grid.width);
+                        const y = @intCast(u32, @divTrunc(i, this.grid.width) % this.grid.width);
                         cell = this.grid.at(x, y).?;
                     }
                 }

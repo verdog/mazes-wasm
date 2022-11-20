@@ -6,7 +6,6 @@ const Distances = @import("distances.zig").Distances;
 
 pub const AldousBroder = struct {
     pub fn on(grid: anytype) !void {
-        // TODO force inline?
         try AldousBroder.onUntilNVisited(grid, grid.size() - 1);
     }
 

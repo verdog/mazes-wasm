@@ -12,12 +12,12 @@ pub const Error = error{
 };
 
 pub const TriCell = struct {
-    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, x: u32, y: u32) TriCell {
+    pub fn init(grid: *TriGrid, xx: u32, yy: u32) TriCell {
         return TriCell{
-            .alctr = alctr,
-            .prng = prng,
-            .x = x,
-            .y = y,
+            .alctr = grid.alctr,
+            .prng = grid.prng,
+            ._x = xx,
+            ._y = yy,
         };
     }
 
@@ -26,7 +26,7 @@ pub const TriCell = struct {
     }
 
     fn isUpright(self: TriCell) bool {
-        return (self.x + self.y) & 1 == 0;
+        return (self.x() + self.y()) & 1 == 0;
     }
 
     pub fn north(self: TriCell) ?*TriCell {
@@ -118,14 +118,14 @@ pub const TriCell = struct {
     }
 
     fn whichNeighbor(self: TriCell, other: TriCell) ?u8 {
-        if (self.y == other.y) {
-            switch (@intCast(i64, other.x) - @intCast(i64, self.x)) {
+        if (self.y() == other.y()) {
+            switch (@intCast(i64, other.x()) - @intCast(i64, self.x())) {
                 1 => return 1,
                 -1 => return 2,
                 else => return null,
             }
-        } else if (self.x == other.x) {
-            switch (@intCast(i64, other.y) - @intCast(i64, self.y)) {
+        } else if (self.x() == other.x()) {
+            switch (@intCast(i64, other.y()) - @intCast(i64, self.y())) {
                 1 => return if (self.isUpright()) 0 else null,
                 -1 => return if (!self.isUpright()) 0 else null,
                 else => return null,
@@ -211,6 +211,18 @@ pub const TriCell = struct {
         return false;
     }
 
+    pub fn x(self: TriCell) u32 {
+        return self._x;
+    }
+
+    pub fn y(self: TriCell) u32 {
+        return self._y;
+    }
+
+    pub fn weight(self: TriCell) u32 {
+        return self._weight;
+    }
+
     /// certain indices hold certain neighbors:
     ///
     /// 0: north or south   / \   \--0--/
@@ -222,9 +234,9 @@ pub const TriCell = struct {
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
-    x: u32,
-    y: u32,
-    weight: u32 = 1,
+    _x: u32,
+    _y: u32,
+    _weight: u32 = 1,
 
     pub const neighbors_len = 3;
 };
@@ -267,7 +279,7 @@ pub const TriGrid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = TriCell.init(self.alctr, self.prng, x, y);
+            cell.* = TriCell.init(self, x, y);
         }
     }
 
@@ -275,13 +287,13 @@ pub const TriGrid = struct {
         for (self.cells_buf) |*cell| {
             // underflow on 0 will be handled by .at(...)
             if (cell.isUpright()) {
-                cell.neighbors_buf[0] = self.at(cell.x, cell.y + 1);
+                cell.neighbors_buf[0] = self.at(cell.x(), cell.y() + 1);
             } else {
-                cell.neighbors_buf[0] = self.at(cell.x, cell.y -% 1);
+                cell.neighbors_buf[0] = self.at(cell.x(), cell.y() -% 1);
             }
 
-            cell.neighbors_buf[1] = self.at(cell.x + 1, cell.y);
-            cell.neighbors_buf[2] = self.at(cell.x -% 1, cell.y);
+            cell.neighbors_buf[1] = self.at(cell.x() + 1, cell.y());
+            cell.neighbors_buf[2] = self.at(cell.x() -% 1, cell.y());
         }
     }
 
@@ -364,8 +376,8 @@ pub const TriGrid = struct {
 };
 
 fn getCoords(cell: TriCell, border_size: u32, tri_width: f64, tri_height: f64) struct { x_center: u32, y_center: u32, x_west: u32, x_east: u32, y_apex: u32, y_base: u32 } {
-    const x_center = border_size + @floatToInt(u32, tri_width / 2.0) + cell.x * @floatToInt(u32, tri_width / 2.0);
-    const y_center = border_size + @floatToInt(u32, tri_height / 2.0) + cell.y * @floatToInt(u32, tri_height);
+    const x_center = border_size + @floatToInt(u32, tri_width / 2.0) + cell.x() * @floatToInt(u32, tri_width / 2.0);
+    const y_center = border_size + @floatToInt(u32, tri_height / 2.0) + cell.y() * @floatToInt(u32, tri_height);
     const x_west = x_center - @floatToInt(u32, tri_width / 2.0);
     const x_east = x_center + @floatToInt(u32, tri_width / 2.0);
     return .{

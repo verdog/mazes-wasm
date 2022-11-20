@@ -12,12 +12,12 @@ pub const Error = error{
 };
 
 pub const UpsilonCell = struct {
-    pub fn init(alc: std.mem.Allocator, prng: *std.rand.DefaultPrng, x: u32, y: u32) UpsilonCell {
+    pub fn init(grid: *UpsilonGrid, xx: u32, yy: u32) UpsilonCell {
         return UpsilonCell{
-            .alctr = alc,
-            .prng = prng,
-            .x = x,
-            .y = y,
+            .alctr = grid.alctr,
+            .prng = grid.prng,
+            ._x = xx,
+            ._y = yy,
         };
     }
 
@@ -26,7 +26,7 @@ pub const UpsilonCell = struct {
     }
 
     fn isOctogon(self: UpsilonCell) bool {
-        return (self.x +% self.y) & 1 == 0;
+        return (self.x() +% self.y()) & 1 == 0;
     }
 
     pub fn north(self: UpsilonCell) ?*UpsilonCell {
@@ -128,8 +128,8 @@ pub const UpsilonCell = struct {
 
     fn whichNeighbor(self: UpsilonCell, other: UpsilonCell) ?u8 {
         const vec = .{
-            .x = @intCast(i64, other.x) - @intCast(i64, self.x),
-            .y = @intCast(i64, other.y) - @intCast(i64, self.y),
+            .x = @intCast(i64, other.x()) - @intCast(i64, self.x()),
+            .y = @intCast(i64, other.y()) - @intCast(i64, self.y()),
         };
         const V = @TypeOf(vec);
 
@@ -221,14 +221,26 @@ pub const UpsilonCell = struct {
         return false;
     }
 
+    pub fn x(self: UpsilonCell) u32 {
+        return self._x;
+    }
+
+    pub fn y(self: UpsilonCell) u32 {
+        return self._y;
+    }
+
+    pub fn weight(self: UpsilonCell) u32 {
+        return self._weight;
+    }
+
     neighbors_buf: [neighbors_len]?*UpsilonCell = [_]?*UpsilonCell{null} ** neighbors_len,
     linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
-    x: u32,
-    y: u32,
-    weight: u32 = 1,
+    _x: u32,
+    _y: u32,
+    _weight: u32 = 1,
 
     pub const neighbors_len = 8;
 };
@@ -271,7 +283,7 @@ pub const UpsilonGrid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = UpsilonCell.init(self.alctr, self.prng, x, y);
+            cell.* = UpsilonCell.init(self, x, y);
         }
     }
 
@@ -279,16 +291,16 @@ pub const UpsilonGrid = struct {
         for (self.cells_buf) |*cell| {
             // underflow on 0 will be handled by .at(...)
             if (cell.isOctogon()) {
-                cell.neighbors_buf[1] = self.at(cell.x + 1, cell.y -% 1);
-                cell.neighbors_buf[3] = self.at(cell.x + 1, cell.y + 1);
-                cell.neighbors_buf[5] = self.at(cell.x -% 1, cell.y + 1);
-                cell.neighbors_buf[7] = self.at(cell.x -% 1, cell.y -% 1);
+                cell.neighbors_buf[1] = self.at(cell.x() + 1, cell.y() -% 1);
+                cell.neighbors_buf[3] = self.at(cell.x() + 1, cell.y() + 1);
+                cell.neighbors_buf[5] = self.at(cell.x() -% 1, cell.y() + 1);
+                cell.neighbors_buf[7] = self.at(cell.x() -% 1, cell.y() -% 1);
             }
 
-            cell.neighbors_buf[0] = self.at(cell.x, cell.y -% 1);
-            cell.neighbors_buf[2] = self.at(cell.x + 1, cell.y);
-            cell.neighbors_buf[4] = self.at(cell.x, cell.y + 1);
-            cell.neighbors_buf[6] = self.at(cell.x -% 1, cell.y);
+            cell.neighbors_buf[0] = self.at(cell.x(), cell.y() -% 1);
+            cell.neighbors_buf[2] = self.at(cell.x() + 1, cell.y());
+            cell.neighbors_buf[4] = self.at(cell.x(), cell.y() + 1);
+            cell.neighbors_buf[6] = self.at(cell.x() -% 1, cell.y());
         }
     }
 
@@ -387,11 +399,11 @@ fn getCoords(cell: UpsilonCell, border_size: f64, cell_width: f64) struct {
     uy3: u32,
     uy4: u32,
 } {
-    const x: f64 = @intToFloat(f64, cell.x) * cell_width * 2 + border_size;
+    const x: f64 = @intToFloat(f64, cell.x()) * cell_width * 2 + border_size;
     const x2 = x + cell_width;
     const x3 = x + cell_width * 2;
     const x4 = x + cell_width * 3;
-    const y: f64 = @intToFloat(f64, cell.y) * cell_width * 2 + border_size;
+    const y: f64 = @intToFloat(f64, cell.y()) * cell_width * 2 + border_size;
     const y2 = y + cell_width;
     const y3 = y + cell_width * 2;
     const y4 = y + cell_width * 3;

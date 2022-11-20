@@ -14,8 +14,9 @@ pub const SquareGrid = @import("square_grid.zig").SquareGrid;
 pub const HexGrid = @import("hex_grid.zig").HexGrid;
 pub const TriGrid = @import("tri_grid.zig").TriGrid;
 pub const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
+pub const WeaveGrid = @import("weave_grid.zig").WeaveGrid;
 
-pub const AllMazes = [_]type{ SquareGrid, HexGrid, TriGrid, UpsilonGrid };
+pub const AllMazes = [_]type{ SquareGrid, HexGrid, TriGrid, UpsilonGrid, WeaveGrid };
 
 const std = @import("std");
 
@@ -57,6 +58,7 @@ pub fn makeQanvas(grid: anytype, walls: bool, scale: usize, inset: f64) !Qanvas 
         HexGrid => return try @import("hex_grid.zig").makeQanvas(grid, walls, scale),
         TriGrid => return try @import("tri_grid.zig").makeQanvas(grid, walls, scale),
         UpsilonGrid => return try @import("upsilon_grid.zig").makeQanvas(grid, walls, scale),
+        WeaveGrid => return try @import("weave_grid.zig").makeQanvas(grid, walls, scale, inset),
         else => return Error.NoSuchMaze,
     }
 }
@@ -67,6 +69,7 @@ test "Test mazes" {
     _ = @import("hex_grid.zig");
     _ = @import("tri_grid.zig");
     _ = @import("upsilon_grid.zig");
+    _ = @import("weave_grid.zig");
 
     _ = @import("distances.zig");
 
@@ -149,8 +152,8 @@ test "grid api: pickRandom" {
 
             var i: usize = 0;
             while (i < 1000) : (i += 1) {
-                try std.testing.expect(g.pickRandom().x < 4);
-                try std.testing.expect(g.pickRandom().y < 4);
+                try std.testing.expect(g.pickRandom().x() < 4);
+                try std.testing.expect(g.pickRandom().y() < 4);
             }
         }
     }.tst;
@@ -283,12 +286,12 @@ test "cell api: Grid has CellT" {
 test "cell api: construct/destruct" {
     const tst = struct {
         fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+
             const CellT = GridT.CellT;
 
-            var alloc = std.testing.allocator;
-            var prng = std.rand.DefaultPrng.init(0);
-
-            var c = CellT.init(alloc, &prng, 0, 0);
+            var c = CellT.init(&g, 0, 0);
             defer c.deinit();
         }
     }.tst;
@@ -299,14 +302,13 @@ test "cell api: construct/destruct" {
 test "cell api: bLink" {
     const tst = struct {
         fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
             const CellT = GridT.CellT;
 
-            var alloc = std.testing.allocator;
-            var prng = std.rand.DefaultPrng.init(0);
-
-            var a = CellT.init(alloc, &prng, 0, 0);
+            var a = CellT.init(&g, 0, 0);
             defer a.deinit();
-            var b = CellT.init(alloc, &prng, 0, 1);
+            var b = CellT.init(&g, 0, 1);
             defer b.deinit();
 
             try a.bLink(&b);
@@ -322,14 +324,13 @@ test "cell api: bLink" {
 test "cell api: unLink" {
     const tst = struct {
         fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
             const CellT = GridT.CellT;
 
-            var alloc = std.testing.allocator;
-            var prng = std.rand.DefaultPrng.init(0);
-
-            var a = CellT.init(alloc, &prng, 0, 0);
+            var a = CellT.init(&g, 0, 0);
             defer a.deinit();
-            var b = CellT.init(alloc, &prng, 0, 1);
+            var b = CellT.init(&g, 0, 1);
             defer b.deinit();
 
             try a.bLink(&b);
@@ -389,7 +390,7 @@ test "cell api: neighbors" {
             errdefer std.debug.print("failing type: {}\n", .{GridT});
 
             switch (GridT.CellT) {
-                SquareGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 4),
+                SquareGrid.CellT, WeaveGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 4),
                 HexGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 6),
                 TriGrid.CellT => try std.testing.expect(countNonNullNeighbors(g.at(1, 1).?) == 3),
                 UpsilonGrid.CellT => {
@@ -435,6 +436,20 @@ test "cell api: randomNeighbor" {
             errdefer std.debug.print("failing type: {}\n", .{GridT});
 
             try std.testing.expect(g.at(0, 0).?.randomNeighbor() != null);
+        }
+    }.tst;
+
+    inline for (AllMazes) |t| try tst(t);
+}
+
+test "cell api: cell has .weight field" {
+    const tst = struct {
+        fn tst(comptime GridT: type) !void {
+            var g = try test_getGrid(GridT);
+            defer g.deinit();
+            errdefer std.debug.print("failing type: {}\n", .{GridT});
+
+            _ = g.at(0, 0).?.weight();
         }
     }.tst;
 

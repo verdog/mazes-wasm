@@ -11,6 +11,7 @@ const TriGrid = @import("tri_grid.zig").TriGrid;
 const TriCell = @import("tri_grid.zig").TriCell;
 const UpsilonGrid = @import("upsilon_grid.zig").UpsilonGrid;
 const UpsilonCell = @import("upsilon_grid.zig").UpsilonCell;
+const WeaveGrid = @import("weave_grid.zig").WeaveGrid;
 
 pub const RecursiveBacktracker = struct {
     pub fn on(grid: anytype) !void {
@@ -19,6 +20,7 @@ pub const RecursiveBacktracker = struct {
             *HexGrid => return try RecursiveBacktracker.on_Generic(HexGrid, HexCell, grid),
             *TriGrid => return try RecursiveBacktracker.on_Generic(TriGrid, TriCell, grid),
             *UpsilonGrid => return try RecursiveBacktracker.on_Generic(UpsilonGrid, UpsilonCell, grid),
+            *WeaveGrid => return try RecursiveBacktracker.on_Generic(WeaveGrid, WeaveGrid.CellT, grid),
             else => std.debug.panic("", .{}),
         }
     }
@@ -47,6 +49,9 @@ pub const RecursiveBacktracker = struct {
         try stack.append(grid.pickRandom());
 
         while (stack.items.len > 0) {
+            if (stack.items.len > grid.size()) {
+                unreachable;
+            }
             if (stack.items[stack.items.len - 1].randomNeighborUnlinked()) |nei| {
                 var cell = stack.items[stack.items.len - 1];
                 try stack.append(nei);

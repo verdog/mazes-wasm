@@ -12,12 +12,13 @@ const expectEq = std.testing.expectEqual;
 
 /// a single maze Cell
 pub const SquareCell = struct {
-    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, y: u32, x: u32) SquareCell {
+    pub fn init(grid: *SquareGrid, yy: u32, xx: u32) SquareCell {
         return SquareCell{
-            .y = y,
-            .x = x,
-            .prng = prng,
-            .alctr = alctr,
+            ._y = yy,
+            ._x = xx,
+            .grid = grid,
+            .prng = grid.prng,
+            .alctr = grid.alctr,
         };
     }
 
@@ -55,10 +56,10 @@ pub const SquareCell = struct {
     }
 
     fn whichNeighbor(self: SquareCell, other: SquareCell) ?u8 {
-        if (self.x == other.x and self.y -% other.y == 1) return 0; // north
-        if (self.x == other.x and other.y -% self.y == 1) return 1; // south
-        if (self.y == other.y and other.x -% self.x == 1) return 2; // east
-        if (self.y == other.y and self.x -% other.x == 1) return 3; // west
+        if (self.x() == other.x() and self.y() -% other.y() == 1) return 0; // north
+        if (self.x() == other.x() and other.y() -% self.y() == 1) return 1; // south
+        if (self.y() == other.y() and other.x() -% self.x() == 1) return 2; // east
+        if (self.y() == other.y() and self.x() -% other.x() == 1) return 3; // west
         return null;
     }
 
@@ -205,9 +206,23 @@ pub const SquareCell = struct {
         return self.neighbors_buf[3];
     }
 
-    y: u32 = 0,
-    x: u32 = 0,
-    weight: u32 = 1,
+    pub fn x(self: SquareCell) u32 {
+        return self._x;
+    }
+
+    pub fn y(self: SquareCell) u32 {
+        return self._y;
+    }
+
+    pub fn weight(self: SquareCell) u32 {
+        return self._weight;
+    }
+
+    _y: u32 = 0,
+    _x: u32 = 0,
+
+    _weight: u32 = 1,
+    grid: *SquareGrid,
     alctr: std.mem.Allocator,
 
     prng: *std.rand.DefaultPrng,
@@ -339,7 +354,7 @@ pub const SquareGrid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = SquareCell.init(self.alctr, self.prng, y, x);
+            cell.* = SquareCell.init(self, y, x);
         }
     }
 
@@ -447,10 +462,10 @@ pub const SquareGrid = struct {
 
         // background
         for (self.cells_buf) |*cell| {
-            const x1 = cell.x * cell_size + border_size;
-            const x2 = (cell.x + 1) * cell_size + border_size;
-            const y1 = cell.y * cell_size + border_size;
-            const y2 = (cell.y + 1) * cell_size + border_size;
+            const x1 = cell.x() * cell_size + border_size;
+            const x2 = (cell.x() + 1) * cell_size + border_size;
+            const y1 = cell.y() * cell_size + border_size;
+            const y2 = (cell.y() + 1) * cell_size + border_size;
 
             if (self.distances) |dists| {
                 if (dists.get(cell)) |thedist| {
@@ -470,10 +485,10 @@ pub const SquareGrid = struct {
             const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 15, .green = 10, .blue = 10 } };
 
             for (self.cells_buf) |*cell| {
-                const x1 = cell.x * cell_size + border_size;
-                const x2 = (cell.x + 1) * cell_size + border_size;
-                const y1 = cell.y * cell_size + border_size;
-                const y2 = (cell.y + 1) * cell_size + border_size;
+                const x1 = cell.x() * cell_size + border_size;
+                const x2 = (cell.x() + 1) * cell_size + border_size;
+                const y1 = cell.y() * cell_size + border_size;
+                const y2 = (cell.y() + 1) * cell_size + border_size;
 
                 if (cell.north() == null) try qanv.line(wall, x1, x2, y1, y1);
                 if (cell.west() == null) try qanv.line(wall, x1, x1, y1, y2);
@@ -540,8 +555,8 @@ pub const SquareGrid = struct {
 
         // background
         for (self.cells_buf) |*cell| {
-            const x1 = cell.x * cell_size + border_size;
-            const y1 = cell.y * cell_size + border_size;
+            const x1 = cell.x() * cell_size + border_size;
+            const y1 = cell.y() * cell_size + border_size;
             const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
             if (self.distances) |dists| {
                 if (dists.get(cell)) |thedist| {
@@ -578,8 +593,8 @@ pub const SquareGrid = struct {
             const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } };
 
             for (self.cells_buf) |*cell| {
-                const x1 = cell.x * cell_size + border_size;
-                const y1 = cell.y * cell_size + border_size;
+                const x1 = cell.x() * cell_size + border_size;
+                const y1 = cell.y() * cell_size + border_size;
                 const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
 
                 if (cell.north() != null and cell.isLinked(cell.north().?)) {

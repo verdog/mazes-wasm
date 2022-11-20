@@ -34,7 +34,7 @@ pub const Wilson = struct {
             try path.append(cell);
 
             // wander until we find an unvisited cell
-            while (visited[cell.y * grid.width + cell.x] == false) {
+            while (visited[cell.y() * grid.width + cell.x()] == false) {
                 cell = cell.randomNeighbor().?;
                 if (std.mem.indexOfScalar(*CellT, path.items, cell)) |visited_idx| {
                     path.shrinkRetainingCapacity(visited_idx + 1);
@@ -45,10 +45,10 @@ pub const Wilson = struct {
 
             // link em
             var i: usize = 0;
-            visited[path.items[i].y * grid.width + path.items[i].x] = true;
+            visited[path.items[i].y() * grid.width + path.items[i].x()] = true;
             while (i < path.items.len - 1) : (i += 1) {
                 try path.items[i].bLink(path.items[i + 1]);
-                visited[path.items[i + 1].y * grid.width + path.items[i + 1].x] = true;
+                visited[path.items[i + 1].y() * grid.width + path.items[i + 1].x()] = true;
             }
         }
     }

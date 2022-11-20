@@ -12,12 +12,12 @@ pub const Error = error{
 };
 
 pub const HexCell = struct {
-    pub fn init(alctr: std.mem.Allocator, prng: *std.rand.DefaultPrng, x: u32, y: u32) HexCell {
+    pub fn init(grid: *HexGrid, xx: u32, yy: u32) HexCell {
         return HexCell{
-            .alctr = alctr,
-            .prng = prng,
-            .x = x,
-            .y = y,
+            .alctr = grid.alctr,
+            .prng = grid.prng,
+            ._x = xx,
+            ._y = yy,
         };
     }
 
@@ -69,26 +69,26 @@ pub const HexCell = struct {
     /// returns in which index `other` should reside in `self`'s neighbor/linked
     /// arrays, if the cells are adjacent. null otherwise.
     fn whichNeighbor(self: HexCell, other: HexCell) ?u8 {
-        if (self.x == other.x) {
+        if (self.x() == other.x()) {
             // vertical neighbors?
-            if (self.y + 1 == other.y) {
+            if (self.y() + 1 == other.y()) {
                 // south
                 return 3;
-            } else if (self.y == other.y + 1) {
+            } else if (self.y() == other.y() + 1) {
                 // north
                 return 0;
             } else {
                 // too far apart in y
                 return null;
             }
-        } else if (self.x + 1 == other.x) {
+        } else if (self.x() + 1 == other.x()) {
             // easterly neighbors?
-            if (self.x & 1 == 0) {
+            if (self.x() & 1 == 0) {
                 // even x coord
-                if (self.y == other.y + 1) {
+                if (self.y() == other.y() + 1) {
                     // north east
                     return 1;
-                } else if (self.y == other.y) {
+                } else if (self.y() == other.y()) {
                     // south east
                     return 2;
                 } else {
@@ -97,10 +97,10 @@ pub const HexCell = struct {
                 }
             } else {
                 // odd x coord
-                if (self.y == other.y) {
+                if (self.y() == other.y()) {
                     // north east
                     return 1;
-                } else if (self.y + 1 == other.y) {
+                } else if (self.y() + 1 == other.y()) {
                     // south east
                     return 2;
                 } else {
@@ -108,14 +108,14 @@ pub const HexCell = struct {
                     return null;
                 }
             }
-        } else if (self.x == other.x + 1) {
+        } else if (self.x() == other.x() + 1) {
             // westerly neighbors?
-            if (self.x & 1 == 0) {
+            if (self.x() & 1 == 0) {
                 // even x coord
-                if (self.y == other.y + 1) {
+                if (self.y() == other.y() + 1) {
                     // north west
                     return 5;
-                } else if (self.y == other.y) {
+                } else if (self.y() == other.y()) {
                     // south west
                     return 4;
                 } else {
@@ -124,10 +124,10 @@ pub const HexCell = struct {
                 }
             } else {
                 // odd x coord
-                if (self.y == other.y) {
+                if (self.y() == other.y()) {
                     // north west
                     return 5;
-                } else if (self.y + 1 == other.y) { // south west
+                } else if (self.y() + 1 == other.y()) { // south west
                     return 4;
                 } else {
                     // too far apart in y
@@ -277,6 +277,18 @@ pub const HexCell = struct {
         return false;
     }
 
+    pub fn x(self: HexCell) u32 {
+        return self._x;
+    }
+
+    pub fn y(self: HexCell) u32 {
+        return self._y;
+    }
+
+    pub fn weight(self: HexCell) u32 {
+        return self._weight;
+    }
+
     /// certain indices hold certain neighbors:
     ///                          _________
     /// 0: north                /    0    \
@@ -291,9 +303,9 @@ pub const HexCell = struct {
 
     alctr: std.mem.Allocator,
     prng: *std.rand.DefaultPrng,
-    x: u32,
-    y: u32,
-    weight: u32 = 1,
+    _x: u32,
+    _y: u32,
+    _weight: u32 = 1,
 
     pub const neighbors_len = 6;
 };
@@ -336,22 +348,22 @@ pub const HexGrid = struct {
         for (self.cells_buf) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
-            cell.* = HexCell.init(self.alctr, self.prng, x, y);
+            cell.* = HexCell.init(self, x, y);
         }
     }
 
     fn configureCells(self: *HexGrid) void {
         for (self.cells_buf) |*cell| {
             // underflow on 0 will be handled by .at(...)
-            const north_diag_y = if (cell.x & 1 == 0) cell.y -% 1 else cell.y;
-            const south_diag_y = if (cell.x & 1 == 0) cell.y else cell.y + 1;
+            const north_diag_y = if (cell.x() & 1 == 0) cell.y() -% 1 else cell.y();
+            const south_diag_y = if (cell.x() & 1 == 0) cell.y() else cell.y() + 1;
 
-            cell.neighbors_buf[0] = self.at(cell.x, cell.y -% 1);
-            cell.neighbors_buf[1] = self.at(cell.x + 1, north_diag_y);
-            cell.neighbors_buf[2] = self.at(cell.x + 1, south_diag_y);
-            cell.neighbors_buf[3] = self.at(cell.x, cell.y + 1);
-            cell.neighbors_buf[4] = self.at(cell.x -% 1, south_diag_y);
-            cell.neighbors_buf[5] = self.at(cell.x -% 1, north_diag_y);
+            cell.neighbors_buf[0] = self.at(cell.x(), cell.y() -% 1);
+            cell.neighbors_buf[1] = self.at(cell.x() + 1, north_diag_y);
+            cell.neighbors_buf[2] = self.at(cell.x() + 1, south_diag_y);
+            cell.neighbors_buf[3] = self.at(cell.x(), cell.y() + 1);
+            cell.neighbors_buf[4] = self.at(cell.x() -% 1, south_diag_y);
+            cell.neighbors_buf[5] = self.at(cell.x() -% 1, north_diag_y);
         }
     }
 
@@ -457,9 +469,9 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
         const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         for (grid.cells_buf) |*cell| {
-            const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
-            var y_center = border_size + ib_size + (cell.y * ib_size * 2);
-            if (cell.x & 1 == 1) y_center += ib_size;
+            const x_center = border_size + (cell_size) + (3 * cell.x() * cell_size / 2);
+            var y_center = border_size + ib_size + (cell.y() * ib_size * 2);
+            if (cell.x() & 1 == 1) y_center += ib_size;
 
             const x_far_west = x_center - cell_size;
             const x_near_west = x_center - cell_size / 2;
@@ -512,9 +524,9 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
     // walls
     if (walls) {
         for (grid.cells_buf) |cell| {
-            const x_center = border_size + (cell_size) + (3 * cell.x * cell_size / 2);
-            var y_center = border_size + ib_size + (cell.y * ib_size * 2);
-            if (cell.x & 1 == 1) y_center += ib_size;
+            const x_center = border_size + (cell_size) + (3 * cell.x() * cell_size / 2);
+            var y_center = border_size + ib_size + (cell.y() * ib_size * 2);
+            if (cell.x() & 1 == 1) y_center += ib_size;
 
             const x_far_west = x_center - cell_size;
             const x_near_west = x_center - cell_size / 2;
@@ -649,19 +661,21 @@ pub fn makeString(grid: *HexGrid) ![]u8 {
 
 test "Construct hex cell" {
     var alloc = std.testing.allocator;
-    var prng = std.rand.DefaultPrng.init(0);
+    var g = try HexGrid.init(alloc, 0, 2, 2);
+    defer g.deinit();
 
-    var c = HexCell.init(alloc, &prng, 0, 0);
+    var c = HexCell.init(&g, 0, 0);
     defer c.deinit();
 }
 
 test "Hex cell link" {
     var alloc = std.testing.allocator;
-    var prng = std.rand.DefaultPrng.init(0);
+    var g = try HexGrid.init(alloc, 0, 2, 2);
+    defer g.deinit();
 
-    var a = HexCell.init(alloc, &prng, 1, 0);
+    var a = HexCell.init(&g, 1, 0);
     defer a.deinit();
-    var b = HexCell.init(alloc, &prng, 0, 0);
+    var b = HexCell.init(&g, 0, 0);
     defer b.deinit();
 
     try a.bLink(&b);
@@ -672,7 +686,8 @@ test "Hex cell link" {
 
 test "Hex cell link" {
     var alloc = std.testing.allocator;
-    var prng = std.rand.DefaultPrng.init(0);
+    var gr = try HexGrid.init(alloc, 0, 4, 4);
+    defer gr.deinit();
 
     //    0  1  2  3
     // 0 /  \__/  \__
@@ -683,21 +698,21 @@ test "Hex cell link" {
     //   \__/e \__/  \
     //      \__/  \__/
 
-    var a = HexCell.init(alloc, &prng, 1, 1);
+    var a = HexCell.init(&gr, 1, 1);
     defer a.deinit();
-    var b = HexCell.init(alloc, &prng, 1, 0);
+    var b = HexCell.init(&gr, 1, 0);
     defer b.deinit();
-    var c = HexCell.init(alloc, &prng, 2, 1);
+    var c = HexCell.init(&gr, 2, 1);
     defer c.deinit();
-    var d = HexCell.init(alloc, &prng, 2, 2);
+    var d = HexCell.init(&gr, 2, 2);
     defer d.deinit();
-    var e = HexCell.init(alloc, &prng, 1, 2);
+    var e = HexCell.init(&gr, 1, 2);
     defer e.deinit();
-    var f = HexCell.init(alloc, &prng, 0, 2);
+    var f = HexCell.init(&gr, 0, 2);
     defer f.deinit();
-    var g = HexCell.init(alloc, &prng, 0, 1);
+    var g = HexCell.init(&gr, 0, 1);
     defer g.deinit();
-    var h = HexCell.init(alloc, &prng, 3, 1);
+    var h = HexCell.init(&gr, 3, 1);
     defer h.deinit();
 
     try a.bLink(&b);
@@ -749,7 +764,8 @@ test "Hex cell link" {
 
 test "Hex cell neighbors/links" {
     var alloc = std.testing.allocator;
-    var prng = std.rand.DefaultPrng.init(0);
+    var gr = try HexGrid.init(alloc, 0, 4, 4);
+    defer gr.deinit();
 
     //    0  1  2  3
     // 0 /  \__/  \__
@@ -760,21 +776,21 @@ test "Hex cell neighbors/links" {
     //   \__/e \__/  \
     //      \__/  \__/
 
-    var a = HexCell.init(alloc, &prng, 1, 1);
+    var a = HexCell.init(&gr, 1, 1);
     defer a.deinit();
-    var b = HexCell.init(alloc, &prng, 1, 0);
+    var b = HexCell.init(&gr, 1, 0);
     defer b.deinit();
-    var c = HexCell.init(alloc, &prng, 2, 1);
+    var c = HexCell.init(&gr, 2, 1);
     defer c.deinit();
-    var d = HexCell.init(alloc, &prng, 2, 2);
+    var d = HexCell.init(&gr, 2, 2);
     defer d.deinit();
-    var e = HexCell.init(alloc, &prng, 1, 2);
+    var e = HexCell.init(&gr, 1, 2);
     defer e.deinit();
-    var f = HexCell.init(alloc, &prng, 0, 2);
+    var f = HexCell.init(&gr, 0, 2);
     defer f.deinit();
-    var g = HexCell.init(alloc, &prng, 0, 1);
+    var g = HexCell.init(&gr, 0, 1);
     defer g.deinit();
-    var h = HexCell.init(alloc, &prng, 3, 1);
+    var h = HexCell.init(&gr, 3, 1);
     defer h.deinit();
 
     try a.bLink(&b);

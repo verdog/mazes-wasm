@@ -22,7 +22,7 @@ pub const HuntAndKill = struct {
             } else {
                 // no available neighbors, find new start
                 var r = grid.pickRandom();
-                var start = r.y * grid.width + r.x;
+                var start = r.y() * grid.width + r.x();
                 var i = if (start + 1 < grid.size()) start + 1 else 0;
 
                 while (i != start) : (i = if (i + 1 < grid.size()) i + 1 else 0) {
