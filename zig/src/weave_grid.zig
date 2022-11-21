@@ -665,7 +665,7 @@ fn cellCoordsWithInset(x: u32, y: u32, cell_size: u32, inset: u32) struct {
     // zig fmt: on
 }
 
-pub fn makeQanvas(self: WeaveGrid, walls: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
+pub fn makeQanvas(self: WeaveGrid, walls: bool, draw_background: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
     const cell_size = @intCast(u32, scale);
     const border_size = cell_size / 2;
     const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
@@ -691,10 +691,10 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, scale: usize, inset_percent: f64
             const y1 = cell.y() * cell_size + border_size;
             const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
 
-            // background
-            if (self.distances) |dists| {
-                if (dists.get(cell)) |thedist| {
-                    // zig fmt: off
+            if (draw_background) {
+                if (self.distances) |dists| {
+                    if (dists.get(cell)) |thedist| {
+                        // zig fmt: off
                     const color = path_low.lerp(path_hi,
                         @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
                                                ).to(qoi.RGB);
@@ -726,13 +726,15 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, scale: usize, inset_percent: f64
                         try qanv.fill(color, coords.x1, coords.x2, coords.y2, coords.y3);
                     }
                     // zig fmt: on
+                    }
                 }
             }
 
             // walls
             if (walls) {
-                // const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } };
-                const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 12, .green = 11, .blue = 11 } };
+                const wall: qoi.Qixel(qoi.RGB) =
+                    if (!draw_background)
+                .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } } else .{ .colors = .{ .red = 12, .green = 11, .blue = 11 } };
 
                 // zig fmt: off
                 if (cell.north() != null and cell.isLinked(cell.north().?)
@@ -765,8 +767,8 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, scale: usize, inset_percent: f64
                 if (cell.west() != null and cell.isLinked(cell.west().?)
                 or  cell.over.neighbors_buf[11] != null and cell.isLinked(cell.over.neighbors_buf[11].?))
                 {
-                    try qanv.line(wall, coords.x1, coords.x2, coords.y2, coords.y2);
-                    try qanv.line(wall, coords.x1, coords.x2, coords.y3, coords.y3);
+                    try qanv.line(wall, coords.x1, coords.x2 + 1, coords.y2, coords.y2);
+                    try qanv.line(wall, coords.x1, coords.x2 + 1, coords.y3, coords.y3);
                 } else {
                     try qanv.line(wall, coords.x2, coords.x2, coords.y2, coords.y3);
                 }

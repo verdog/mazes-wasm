@@ -12,6 +12,7 @@ const Options = struct {
     text: bool = true,
     qoi: bool = false,
     qoi_walls: bool = true,
+    qoi_bg: bool = true,
     braid: f64 = 0,
     seed: u64 = 0,
     width: u32 = 8,
@@ -53,6 +54,10 @@ const Options = struct {
                 opts.qoi_walls = true;
             } else if (eq(u8, "--noqoi-walls", arg)) {
                 opts.qoi_walls = false;
+            } else if (eq(u8, "--qoi-bg", arg)) {
+                opts.qoi_bg = true;
+            } else if (eq(u8, "--noqoi-bg", arg)) {
+                opts.qoi_bg = false;
             } else {
                 // values
                 var it = std.mem.split(u8, arg, "=");
@@ -124,6 +129,7 @@ const Options = struct {
             \\ - text: {}
             \\ - qoi: {}
             \\ - qoi_walls: {}
+            \\ - qoi_bg: {}
             \\ - braid: {d}
             \\ - seed: {d}
             \\ - width: {d}
@@ -138,6 +144,7 @@ const Options = struct {
             opt.text,
             opt.qoi,
             opt.qoi_walls,
+            opt.qoi_bg,
             opt.braid,
             opt.seed,
             opt.width,
@@ -375,7 +382,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     {
         std.debug.print("Encoding image... ", .{});
         var timer = try std.time.Timer.start();
-        var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.scale, opt.inset);
+        var qanv = try maze.makeQanvas(grid, opt.qoi_walls, opt.qoi_bg, opt.scale, opt.inset);
         var time = timer.read();
         std.debug.print("Done ({} microseconds)\n", .{time / 1000});
 
