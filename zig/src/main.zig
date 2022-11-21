@@ -18,7 +18,7 @@ const Options = struct {
     height: u32 = 8,
     scale: usize = 8,
     inset: f64 = 0,
-    @"type": [64]u8 = u.strBuf(64, "RecursiveBacktracker"),
+    type: [64]u8 = u.strBuf(64, "recursivebacktracker"),
     viz: Vizualization = .heat,
     grid: Grid = .square,
 
@@ -85,13 +85,13 @@ const Options = struct {
                     } else if (eq(u8, "--type", left)) {
                         if (it.next()) |right| {
                             if (eq(u8, "None", right)) {
-                                std.mem.copy(u8, &opts.@"type", right);
-                                opts.@"type"[right.len] = 0;
+                                std.mem.copy(u8, &opts.type, right);
+                                opts.type[right.len] = 0;
                             } else {
                                 for (@typeInfo(maze).Struct.decls) |dec| {
                                     if (eq(u8, dec.name, right)) {
-                                        std.mem.copy(u8, &opts.@"type", right);
-                                        opts.@"type"[right.len] = 0;
+                                        std.mem.copy(u8, &opts.type, right);
+                                        opts.type[right.len] = 0;
                                     }
                                 }
                             }
@@ -144,7 +144,7 @@ const Options = struct {
             opt.height,
             opt.scale,
             opt.inset,
-            std.mem.sliceTo(&opt.@"type", 0),
+            std.mem.sliceTo(&opt.type, 0),
             u.eString(Options.Vizualization, opt.viz),
             u.eString(Options.Grid, opt.grid),
         });
@@ -189,26 +189,90 @@ pub fn main() !void {
     var sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
     defer sdl_tex.destroy();
 
+    var command_buffer = [_]u8{0} ** 80;
+    var command_cursor: usize = 0;
+
     main_loop: while (true) {
         while (sdl2.pollEvent()) |ev| {
+            var refresh = false;
             switch (ev) {
                 .quit => break :main_loop,
                 .mouse_button_up => |mouse| {
                     if (mouse.button == .left) {
-                        maze_qan.deinit();
-                        heap.deinit();
-                        heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-                        opts.newSeed();
-                        maze_qan = try dispatch(opts, heap.allocator());
-                        try maze_qan.encodeSdlUpdate(&sdl_tex);
+                        refresh = true;
                     }
                 },
                 .key_up => |key| {
-                    // TODO parse commands to change the settings
-                    _ = key;
-                    try stdout.print("TODO\n", .{});
+                    if (key.keycode == .@"return") {
+                        try stdout.print("\n", .{});
+
+                        // parse buffer
+                        const eq = std.mem.eql;
+
+                        defer {
+                            // clear buffer
+                            std.mem.set(u8, &command_buffer, 0);
+                            command_cursor = 0;
+                        }
+
+                        if (eq(u8, "exit", std.mem.sliceTo(&command_buffer, 0))) {
+                            break :main_loop;
+                        } else if (eq(u8, "", std.mem.sliceTo(&command_buffer, 0))) {
+                            refresh = true;
+                            try stdout.print("=> refresh\n", .{});
+                        } else {
+                            var argv = [_][]const u8{undefined} ** 32;
+                            var it = std.mem.split(u8, std.mem.sliceTo(&command_buffer, 0), " ");
+
+                            var i: usize = 0;
+                            while (it.next()) |word| : (i += 1) {
+                                argv[i] = word;
+                            }
+
+                            const old_opts = opts;
+
+                            opts.parse(argv[0..i]) catch {
+                                try stdout.print("=> error during parse.\n", .{});
+                                break;
+                            };
+
+                            if (!std.mem.eql(u8, std.mem.asBytes(&old_opts), std.mem.asBytes(&opts)))
+                                try stdout.print("=> ok\n", .{})
+                            else
+                                try stdout.print("=> no change\n", .{});
+                        }
+                    } else {
+                        const char: ?u8 = blk: {
+                            const num = @enumToInt(key.keycode);
+                            break :blk if (num & 0xff == num)
+                                @intCast(u8, num)
+                            else
+                                null;
+                        };
+
+                        if (char) |c| {
+                            try stdout.print("{c}", .{c});
+                            command_buffer[command_cursor] = c;
+                            command_cursor += 1;
+                            if (command_cursor >= command_buffer.len)
+                                command_cursor = command_buffer.len;
+                        }
+                    }
                 },
                 else => {},
+            }
+            if (refresh) {
+                maze_qan.deinit();
+                sdl_tex.destroy();
+                heap.deinit();
+
+                heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+                opts.newSeed();
+
+                maze_qan = try dispatch(opts, heap.allocator());
+                sdl2.c.SDL_SetWindowSize(sdl_window.ptr, @intCast(c_int, maze_qan.width), @intCast(c_int, maze_qan.height));
+
+                sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
             }
         }
 
@@ -239,7 +303,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
     {
         std.debug.print("Generating... ", .{});
         var timer = try std.time.Timer.start();
-        try maze.onByName(&opt.@"type", &grid);
+        try maze.onByName(&opt.type, &grid);
         var time = timer.read();
         std.debug.print("Done ({} microseconds)\n", .{time / 1000});
     }

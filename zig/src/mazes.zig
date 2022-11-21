@@ -1,12 +1,13 @@
 pub const Distances = @import("distances.zig").Distances;
 
-pub const BinaryTree = @import("binary_tree.zig").BinaryTree;
-pub const Sidewinder = @import("sidewinder.zig").Sidewinder;
-pub const AldousBroder = @import("aldous_broder.zig").AldousBroder;
-pub const Wilson = @import("wilson.zig").Wilson;
-pub const Fast = @import("fast.zig").Fast;
-pub const HuntAndKill = @import("hunt_and_kill.zig").HuntAndKill;
-pub const RecursiveBacktracker = @import("recursive_backtracker.zig").RecursiveBacktracker;
+// HACK: these should be lowercase for terminal functionality
+pub const binarytree = @import("binary_tree.zig").BinaryTree;
+pub const sidewinder = @import("sidewinder.zig").Sidewinder;
+pub const aldousbroder = @import("aldous_broder.zig").AldousBroder;
+pub const wilson = @import("wilson.zig").Wilson;
+pub const fast = @import("fast.zig").Fast;
+pub const huntandkill = @import("hunt_and_kill.zig").HuntAndKill;
+pub const recursivebacktracker = @import("recursive_backtracker.zig").RecursiveBacktracker;
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
@@ -27,17 +28,19 @@ pub const Error = error{
 pub fn onByName(name: []const u8, grid: anytype) !void {
     const eq = @import("std").mem.startsWith;
 
+    // HACK: these should be lowercase for terminal functionality
+
     if (@TypeOf(grid) == *SquareGrid) {
-        if (eq(u8, name, "Sidewinder")) return try Sidewinder.on(grid);
-        if (eq(u8, name, "BinaryTree")) return try BinaryTree.on(grid);
+        if (eq(u8, name, "sidewinder")) return try sidewinder.on(grid);
+        if (eq(u8, name, "binarytree")) return try binarytree.on(grid);
     }
 
-    if (eq(u8, name, "None")) return;
-    if (eq(u8, name, "AldousBroder")) return try AldousBroder.on(grid);
-    if (eq(u8, name, "Wilson")) return try Wilson.on(grid);
-    if (eq(u8, name, "Fast")) return try Fast.on(grid);
-    if (eq(u8, name, "HuntAndKill")) return try HuntAndKill.on(grid);
-    if (eq(u8, name, "RecursiveBacktracker")) return try RecursiveBacktracker.on(grid);
+    if (eq(u8, name, "none")) return;
+    if (eq(u8, name, "aldousBroder")) return try aldousbroder.on(grid);
+    if (eq(u8, name, "wilson")) return try wilson.on(grid);
+    if (eq(u8, name, "fast")) return try fast.on(grid);
+    if (eq(u8, name, "huntandkill")) return try huntandkill.on(grid);
+    if (eq(u8, name, "recursivebacktracker")) return try recursivebacktracker.on(grid);
 
     return Error.NoSuchMaze;
 }
