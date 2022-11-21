@@ -209,7 +209,7 @@ pub fn main() !void {
                         refresh = true;
                     }
                 },
-                .key_up => |key| {
+                .key_down => |key| {
                     if (key.keycode == .@"return") {
                         try stdout.print("\n", .{});
 
@@ -247,6 +247,13 @@ pub fn main() !void {
                                 try stdout.print("=> ok\n", .{})
                             else
                                 try stdout.print("=> no change\n", .{});
+                        }
+                    } else if (key.keycode == .backspace) {
+                        if (command_cursor > 0) {
+                            command_cursor -= 1;
+                            command_buffer[command_cursor] = 0;
+                            // print backspace so terminal updates
+                            try stdout.print("{c} {c}", .{ 0x08, 0x08 });
                         }
                     } else {
                         const char: ?u8 = blk: {
