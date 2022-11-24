@@ -10,6 +10,8 @@ pub const huntandkill = @import("hunt_and_kill.zig").HuntAndKill;
 pub const recursivebacktracker = @import("recursive_backtracker.zig").RecursiveBacktracker;
 pub const kruskals = @import("kruskals.zig").Kruskals;
 pub const growingtree = @import("growing_tree.zig").GrowingTree;
+pub const growingtreespindly = @import("growing_tree.zig").GrowingTreeSpindly;
+pub const growingtreemixed = @import("growing_tree.zig").GrowingTreeMixed;
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
@@ -28,6 +30,8 @@ pub const Error = error{
 };
 
 pub fn onByName(name: []const u8, grid: anytype) !void {
+    // Careful when using startsWith, types with shared starts (like growingtree) need
+    // to be checked from longest to shortest.
     const eq = @import("std").mem.startsWith;
 
     // HACK: these should be lowercase for terminal functionality
@@ -47,6 +51,8 @@ pub fn onByName(name: []const u8, grid: anytype) !void {
     if (eq(u8, name, "fast")) return try fast.on(grid);
     if (eq(u8, name, "huntandkill")) return try huntandkill.on(grid);
     if (eq(u8, name, "recursivebacktracker")) return try recursivebacktracker.on(grid);
+    if (eq(u8, name, "growingtreespindly")) return try growingtreespindly.on(grid);
+    if (eq(u8, name, "growingtreemixed")) return try growingtreemixed.on(grid);
     if (eq(u8, name, "growingtree")) return try growingtree.on(grid);
 
     return Error.NoSuchMaze;

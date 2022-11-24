@@ -10,6 +10,22 @@ pub const GrowingTree = struct {
     }
 };
 
+pub const GrowingTreeSpindly = struct {
+    pub fn on(grid: anytype) !void {
+        // grid should be a pointer
+        const algo = genGrowingTree(@TypeOf(grid.*), genPickLast(@TypeOf(grid.*))){};
+        try algo.on(grid);
+    }
+};
+
+pub const GrowingTreeMixed = struct {
+    pub fn on(grid: anytype) !void {
+        // grid should be a pointer
+        const algo = genGrowingTree(@TypeOf(grid.*), genPickMixed(@TypeOf(grid.*))){};
+        try algo.on(grid);
+    }
+};
+
 fn genGrowingTree(comptime GridT: type, comptime pickFn: fn (std.ArrayList(*GridT.CellT)) usize) type {
     return struct {
         pick: @TypeOf(pickFn) = pickFn,
@@ -66,6 +82,22 @@ fn genPickFirst(comptime GridT: type) fn (std.ArrayList(*GridT.CellT)) usize {
     return gen.pick;
 }
 
+fn genPickMixed(comptime GridT: type) fn (std.ArrayList(*GridT.CellT)) usize {
+    const gen = struct {
+        fn pick(list: std.ArrayList(*GridT.CellT)) usize {
+            var random = list.items[0].prng().random();
+
+            if (random.intRangeLessThan(usize, 0, 10) < 8) {
+                return list.items.len - 1;
+            } else {
+                return list.items[0].prng().random().intRangeLessThan(usize, 0, list.items.len);
+            }
+        }
+    };
+
+    return gen.pick;
+}
+
 const SquareGrid = @import("square_grid.zig").SquareGrid;
 
 test "end to end: pickLast" {
@@ -73,8 +105,7 @@ test "end to end: pickLast" {
     var g = try SquareGrid.init(alloc, 0, 10, 10);
     defer g.deinit();
 
-    const algo = genGrowingTree(SquareGrid, genPickLast(SquareGrid)){};
-    try algo.on(&g);
+    try GrowingTreeSpindly.on(&g);
 
     const s = try g.makeString();
     defer g.alctr.free(s);
