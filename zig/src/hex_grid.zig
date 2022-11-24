@@ -15,7 +15,7 @@ pub const HexCell = struct {
     pub fn init(grid: *HexGrid, xx: u32, yy: u32) HexCell {
         return HexCell{
             .alctr = grid.alctr,
-            .prng = grid.prng,
+            ._prng = grid.prng,
             ._x = xx,
             ._y = yy,
         };
@@ -155,7 +155,7 @@ pub const HexCell = struct {
             }
             break :blk c;
         };
-        const choice = self.prng.random().intRangeLessThan(usize, 0, count);
+        const choice = self.prng().random().intRangeLessThan(usize, 0, count);
         return my_neighbors[choice];
     }
 
@@ -174,7 +174,7 @@ pub const HexCell = struct {
 
         return blk: {
             if (write == 0) break :blk null;
-            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            const choice = self.prng().random().intRangeLessThan(usize, 0, write);
             break :blk my_neighbors[choice];
         };
     }
@@ -195,7 +195,7 @@ pub const HexCell = struct {
 
         return blk: {
             if (write == 0) break :blk null;
-            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            const choice = self.prng().random().intRangeLessThan(usize, 0, write);
             break :blk my_neighbors[choice];
         };
     }
@@ -220,7 +220,7 @@ pub const HexCell = struct {
         }
 
         if (actual_links != 0) {
-            var random = self.prng.random();
+            var random = self.prng().random();
             const choice = random.intRangeLessThan(usize, 0, actual_links);
             return potential_links[choice];
         } else {
@@ -289,6 +289,10 @@ pub const HexCell = struct {
         return self._weight;
     }
 
+    pub fn prng(self: @This()) *std.rand.DefaultPrng {
+        return self._prng;
+    }
+
     /// certain indices hold certain neighbors:
     ///                          _________
     /// 0: north                /    0    \
@@ -302,7 +306,7 @@ pub const HexCell = struct {
     linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
-    prng: *std.rand.DefaultPrng,
+    _prng: *std.rand.DefaultPrng,
     _x: u32,
     _y: u32,
     _weight: u32 = 1,

@@ -15,7 +15,7 @@ pub const TriCell = struct {
     pub fn init(grid: *TriGrid, xx: u32, yy: u32) TriCell {
         return TriCell{
             .alctr = grid.alctr,
-            .prng = grid.prng,
+            ._prng = grid.prng,
             ._x = xx,
             ._y = yy,
         };
@@ -72,7 +72,7 @@ pub const TriCell = struct {
             }
             break :blk c;
         };
-        const choice = self.prng.random().intRangeLessThan(usize, 0, count);
+        const choice = self.prng().random().intRangeLessThan(usize, 0, count);
         return my_neighbors[choice];
     }
 
@@ -91,7 +91,7 @@ pub const TriCell = struct {
 
         return blk: {
             if (write == 0) break :blk null;
-            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            const choice = self.prng().random().intRangeLessThan(usize, 0, write);
             break :blk my_neighbors[choice];
         };
     }
@@ -112,7 +112,7 @@ pub const TriCell = struct {
 
         return blk: {
             if (write == 0) break :blk null;
-            const choice = self.prng.random().intRangeLessThan(usize, 0, write);
+            const choice = self.prng().random().intRangeLessThan(usize, 0, write);
             break :blk my_neighbors[choice];
         };
     }
@@ -154,7 +154,7 @@ pub const TriCell = struct {
         }
 
         if (actual_links != 0) {
-            var random = self.prng.random();
+            var random = self.prng().random();
             const choice = random.intRangeLessThan(usize, 0, actual_links);
             return potential_links[choice];
         } else {
@@ -223,6 +223,10 @@ pub const TriCell = struct {
         return self._weight;
     }
 
+    pub fn prng(self: @This()) *std.rand.DefaultPrng {
+        return self._prng;
+    }
+
     /// certain indices hold certain neighbors:
     ///
     /// 0: north or south   / \   \--0--/
@@ -233,7 +237,7 @@ pub const TriCell = struct {
     linked: [neighbors_len]bool = [_]bool{false} ** neighbors_len,
 
     alctr: std.mem.Allocator,
-    prng: *std.rand.DefaultPrng,
+    _prng: *std.rand.DefaultPrng,
     _x: u32,
     _y: u32,
     _weight: u32 = 1,

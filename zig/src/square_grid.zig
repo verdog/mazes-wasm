@@ -17,7 +17,7 @@ pub const SquareCell = struct {
             ._y = yy,
             ._x = xx,
             .grid = grid,
-            .prng = grid.prng,
+            ._prng = grid.prng,
             .alctr = grid.alctr,
         };
     }
@@ -94,7 +94,7 @@ pub const SquareCell = struct {
         }
 
         if (actual_links != 0) {
-            var random = self.prng.random();
+            var random = self.prng().random();
             const choice = random.intRangeLessThan(usize, 0, actual_links);
             return potential_links[choice];
         } else {
@@ -129,7 +129,7 @@ pub const SquareCell = struct {
         var neis = std.mem.sliceTo(&neis_buf, null);
 
         if (neis[0] != null) {
-            var choice = self.prng.random().intRangeLessThan(usize, 0, neis.len);
+            var choice = self.prng().random().intRangeLessThan(usize, 0, neis.len);
             return neis[choice];
         } else {
             return null;
@@ -156,7 +156,7 @@ pub const SquareCell = struct {
         const potential_neighbors = potential_neighbors_buf[0..actual_neighbors];
 
         if (actual_neighbors != 0) {
-            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
+            var choice = self.prng().random().intRangeLessThan(usize, 0, actual_neighbors);
             return potential_neighbors[choice];
         } else {
             return null;
@@ -183,7 +183,7 @@ pub const SquareCell = struct {
         const potential_neighbors = potential_neighbors_buf[0..actual_neighbors];
 
         if (actual_neighbors != 0) {
-            var choice = self.prng.random().intRangeLessThan(usize, 0, actual_neighbors);
+            var choice = self.prng().random().intRangeLessThan(usize, 0, actual_neighbors);
             return potential_neighbors[choice];
         } else {
             return null;
@@ -214,6 +214,10 @@ pub const SquareCell = struct {
         return self._y;
     }
 
+    pub fn prng(self: @This()) *std.rand.DefaultPrng {
+        return self._prng;
+    }
+
     pub fn weight(self: SquareCell) u32 {
         return self._weight;
     }
@@ -225,7 +229,7 @@ pub const SquareCell = struct {
     grid: *SquareGrid,
     alctr: std.mem.Allocator,
 
-    prng: *std.rand.DefaultPrng,
+    _prng: *std.rand.DefaultPrng,
 
     // north, south, east, west
     neighbors_buf: [neighbors_len]?*SquareCell = [_]?*SquareCell{null} ** neighbors_len,
