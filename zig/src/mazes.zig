@@ -8,6 +8,7 @@ pub const wilson = @import("wilson.zig").Wilson;
 pub const fast = @import("fast.zig").Fast;
 pub const huntandkill = @import("hunt_and_kill.zig").HuntAndKill;
 pub const recursivebacktracker = @import("recursive_backtracker.zig").RecursiveBacktracker;
+pub const kruskals = @import("kruskals.zig").Kruskals;
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
@@ -33,6 +34,10 @@ pub fn onByName(name: []const u8, grid: anytype) !void {
     if (@TypeOf(grid) == *SquareGrid) {
         if (eq(u8, name, "sidewinder")) return try sidewinder.on(grid);
         if (eq(u8, name, "binarytree")) return try binarytree.on(grid);
+    }
+
+    if (@TypeOf(grid) == *SquareGrid or @TypeOf(grid) == *WeaveGrid) {
+        if (eq(u8, name, "kruskals")) return try kruskals.on(grid);
     }
 
     if (eq(u8, name, "none")) return;
@@ -84,6 +89,7 @@ test "Test mazes" {
     _ = @import("fast.zig");
     _ = @import("hunt_and_kill.zig");
     _ = @import("recursive_backtracker.zig");
+    _ = @import("kruskals.zig");
 }
 
 fn test_getGrid(comptime GridT: type) !GridT {
