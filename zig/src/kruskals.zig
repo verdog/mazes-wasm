@@ -2,6 +2,8 @@
 
 const std = @import("std");
 
+const WeaveGrid = @import("weave_grid.zig").WeaveGrid;
+
 /// Kruskals algorithm internal state
 fn State(comptime GridT: type) type {
     return struct {
@@ -13,16 +15,17 @@ fn State(comptime GridT: type) type {
         };
 
         neighbor_pairs_buf: []NeighborPair,
+        neighbor_pairs: []NeighborPair = undefined,
         cell_setinfo_buf: []CellSetInfo,
         alctr: std.mem.Allocator,
-        row_width: usize,
+        grid: *GridT,
 
         pub fn init(grid: *GridT) !This {
-            var s = .{
+            var s = This{
                 .neighbor_pairs_buf = try grid.alctr.alloc(NeighborPair, (grid.width - 1) * (grid.height) + (grid.height - 1) * (grid.width)),
-                .cell_setinfo_buf = try grid.alctr.alloc(CellSetInfo, grid.size()),
+                .cell_setinfo_buf = try grid.alctr.alloc(CellSetInfo, grid.size() * 2),
                 .alctr = grid.alctr,
-                .row_width = grid.width,
+                .grid = grid,
             };
 
             {
@@ -48,11 +51,12 @@ fn State(comptime GridT: type) type {
                 }
 
                 grid.prng.random().shuffle(NeighborPair, s.neighbor_pairs_buf);
+                s.neighbor_pairs = s.neighbor_pairs_buf;
             }
 
             for (s.cell_setinfo_buf) |*info, i| {
-                const x = @intCast(u32, i % grid.width);
-                const y = @intCast(u32, @divTrunc(i, grid.width));
+                const x = @intCast(u32, (i % s.grid.size()) % grid.width);
+                const y = @intCast(u32, @divTrunc(i % s.grid.size(), grid.width));
                 const cell = grid.at(x, y).?;
 
                 info.* = .{ .cell = cell, .set = @intCast(u32, i) };
@@ -70,7 +74,14 @@ fn State(comptime GridT: type) type {
             var fixup_buf = [_]?*CellSetInfo{null} ** 64;
             var fixup_i: usize = 0;
 
-            var info: *CellSetInfo = &self.cell_setinfo_buf[self.row_width * cell.y() + cell.x()];
+            const idx = blk: {
+                var i = self.grid.width * cell.y() + cell.x();
+                if (GridT == WeaveGrid and std.meta.activeTag(cell.*) == .under)
+                    i += @intCast(u32, self.grid.size());
+                break :blk i;
+            };
+
+            var info: *CellSetInfo = &self.cell_setinfo_buf[idx];
             while (info.next != null) {
                 fixup_buf[fixup_i] = info;
                 info = info.next.?;
@@ -93,6 +104,63 @@ fn State(comptime GridT: type) type {
             right_info.next = left_info;
         }
 
+        pub fn addCrossing(self: *This, cell: *GridT.CellT) !void {
+            if (GridT != WeaveGrid) {
+                @compileError("Oops");
+            }
+
+            // validate that we can cross this cell
+            var north = cell.north() orelse return error.CantCross;
+            var south = cell.south() orelse return error.CantCross;
+            var east = cell.east() orelse return error.CantCross;
+            var west = cell.west() orelse return error.CantCross;
+
+            // zig fmt: off
+            if (cell.numLinks() > 0
+            or (self.setOfCell(north) == self.setOfCell(south))
+            or (self.setOfCell(west) == self.setOfCell(east)))
+            {
+                return error.CantCross;
+                // zig fmt: on
+            }
+
+            { // filter out cells from consideration in kruskals later
+                var len = self.neighbor_pairs.len;
+                var read: usize = 0;
+                var write: usize = 0;
+                while (read < len) : (read += 1) {
+                    var read_cell = self.neighbor_pairs_buf[read];
+                    if (read_cell.@"0" == cell or read_cell.@"1" == cell) {
+                        continue;
+                    }
+
+                    self.neighbor_pairs_buf[write] = self.neighbor_pairs_buf[read];
+                    write += 1;
+                }
+
+                self.neighbor_pairs.len = write;
+            }
+
+            // cross
+            if (self.grid.prng.random().intRangeLessThan(usize, 0, 2) == 0) {
+                // west/east on top
+                try self.merge(.{ west, cell });
+                try self.merge(.{ cell, east });
+
+                self.grid.tunnelUnder(cell);
+                try self.merge(.{ north.over.neighbors_buf[9].?, north });
+                try self.merge(.{ south.over.neighbors_buf[8].?, south });
+            } else {
+                // north/south on top
+                try self.merge(.{ north, cell });
+                try self.merge(.{ cell, south });
+
+                self.grid.tunnelUnder(cell);
+                try self.merge(.{ west.over.neighbors_buf[10].?, west });
+                try self.merge(.{ east.over.neighbors_buf[11].?, east });
+            }
+        }
+
         pub fn setOfCell(self: *This, cell: *GridT.CellT) u32 {
             return self.headSetOfCell(cell).set;
         }
@@ -106,7 +174,17 @@ pub const Kruskals = struct {
         var state = try State(@TypeOf(grid.*)).init(grid);
         defer state.deinit();
 
-        for (state.neighbor_pairs_buf) |pair| {
+        if (@TypeOf(grid.*) == WeaveGrid) {
+            var i: usize = 0;
+            while (i < grid.size()) : (i += 1) {
+                state.addCrossing(grid.pickRandom()) catch |e| switch (e) {
+                    error.CantCross => {}, // ok
+                    else => return e,
+                };
+            }
+        }
+
+        for (state.neighbor_pairs) |pair| {
             state.merge(pair) catch |e| switch (e) {
                 error.CantMerge => {}, // ok
                 else => return e,
@@ -159,7 +237,7 @@ test "state: setOfCell" {
     try std.testing.expect(s.setOfCell(l) == s.setOfCell(r));
 }
 
-test "end2end" {
+test "end to end: square grid" {
     var g = try testGrid();
     defer g.deinit();
 
@@ -194,4 +272,14 @@ test "end2end" {
     ;
 
     try std.testing.expectEqualStrings(m, s);
+}
+
+test "end to end: weave grid" {
+    // just make sure it doesn't panic
+
+    var alloc = std.testing.allocator;
+    var g = try WeaveGrid.init(alloc, 0, 10, 10);
+    defer g.deinit();
+
+    try Kruskals.on(&g);
 }
