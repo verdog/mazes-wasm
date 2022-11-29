@@ -99,6 +99,7 @@ test "Test mazes" {
     _ = @import("recursive_backtracker.zig");
     _ = @import("kruskals.zig");
     _ = @import("growing_tree.zig");
+    _ = @import("ellers.zig");
 }
 
 fn test_getGrid(comptime GridT: type) !GridT {
