@@ -30,7 +30,7 @@ pub fn State(comptime GridT: type) type {
         }
 
         fn getSetInfoOfCell(self: *This, cell: *GridT.CellT) *CellSetInfo {
-            return &self.cell_setinfo_buf[cell.y()];
+            return &self.cell_setinfo_buf[cell.x()];
         }
 
         /// Caller is responsible for freeing returned slice
@@ -48,7 +48,7 @@ pub fn State(comptime GridT: type) type {
         }
 
         pub fn record(self: *This, set: u32, cell: *GridT.CellT) void {
-            self.cell_setinfo_buf[cell.y()] = .{ .cell = cell, .set = set };
+            self.cell_setinfo_buf[cell.x()] = .{ .cell = cell, .set = set };
         }
 
         pub fn getSetOfCell(self: *This, cell: *GridT.CellT) u32 {
@@ -135,7 +135,53 @@ pub fn State(comptime GridT: type) type {
     };
 }
 
-pub const Ellers = struct {};
+pub const Ellers = struct {
+    pub fn on(grid: anytype) !void {
+        // grid should be a pointer
+        var state = try State(@TypeOf(grid.*)).init(grid.alctr, grid.width, 0);
+        defer state.deinit();
+
+        {
+            var row_i: usize = 0;
+            while (row_i < grid.height) : (row_i += 1) {
+                const row_start = row_i * grid.width;
+                const row = grid.cells_buf[row_start .. row_start + grid.width];
+                for (row) |*cell| {
+                    if (cell.west() == null) continue;
+
+                    const set = state.getSetOfCell(cell);
+                    const prior_set = state.getSetOfCell(cell.west().?);
+
+                    const should_link = set != prior_set and (cell.south() == null or grid.prng.random().intRangeLessThan(usize, 0, 2) == 0);
+
+                    if (should_link) {
+                        try cell.bLink(cell.west().?);
+                        try state.merge(prior_set, set);
+                    }
+                }
+
+                var next_state = try state.nextRow();
+                defer state = next_state;
+                defer state.deinit();
+
+                if (row[0].south() != null) {
+                    var it = try state.sortedSets();
+                    defer it.deinit();
+                    while (it.next()) |set| {
+                        grid.prng.random().shuffle(*State(@TypeOf(grid.*)).CellSetInfo, set);
+                        for (set) |info, i| {
+                            const pick = grid.prng.random().intRangeLessThan(usize, 0, 3);
+                            if (i == 0 or pick == 0) {
+                                try info.cell.?.bLink(info.cell.?.south().?);
+                                next_state.record(state.getSetOfCell(info.cell.?), info.cell.?.south().?);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
 
 const SquareGrid = @import("square_grid.zig").SquareGrid;
 
@@ -156,9 +202,9 @@ test "state: getSetOfCell assigns default value if one isn't present" {
     var set_a = st.getSetOfCell(g.at(0, 0).?);
 
     sets[0] = st.getSetOfCell(g.at(0, 0).?);
-    sets[1] = st.getSetOfCell(g.at(0, 1).?);
-    sets[2] = st.getSetOfCell(g.at(0, 2).?);
-    sets[3] = st.getSetOfCell(g.at(0, 3).?);
+    sets[1] = st.getSetOfCell(g.at(1, 0).?);
+    sets[2] = st.getSetOfCell(g.at(2, 0).?);
+    sets[3] = st.getSetOfCell(g.at(3, 0).?);
 
     try std.testing.expect(sets[0] == set_a);
     try std.testing.expect(sets[1] != set_a);
@@ -186,13 +232,13 @@ test "state: getCellsOfSet" {
     defer st.deinit();
 
     st.record(0, grid.at(0, 0).?);
-    st.record(0, grid.at(0, 1).?);
-    st.record(0, grid.at(0, 2).?);
-    st.record(1, grid.at(0, 3).?);
-    st.record(1, grid.at(0, 4).?);
-    st.record(1, grid.at(0, 5).?);
-    st.record(2, grid.at(0, 6).?);
-    st.record(3, grid.at(0, 7).?);
+    st.record(0, grid.at(1, 0).?);
+    st.record(0, grid.at(2, 0).?);
+    st.record(1, grid.at(3, 0).?);
+    st.record(1, grid.at(4, 0).?);
+    st.record(1, grid.at(5, 0).?);
+    st.record(2, grid.at(6, 0).?);
+    st.record(3, grid.at(7, 0).?);
 
     {
         var set_zero = try st.getCellsOfSet(0);
@@ -200,31 +246,31 @@ test "state: getCellsOfSet" {
 
         try std.testing.expect(set_zero.len == 3);
         try std.testing.expect(set_zero[0] == grid.at(0, 0).?);
-        try std.testing.expect(set_zero[1] == grid.at(0, 1).?);
-        try std.testing.expect(set_zero[2] == grid.at(0, 2).?);
+        try std.testing.expect(set_zero[1] == grid.at(1, 0).?);
+        try std.testing.expect(set_zero[2] == grid.at(2, 0).?);
     }
     {
         var set_one = try st.getCellsOfSet(1);
         defer alctr.free(set_one);
 
         try std.testing.expect(set_one.len == 3);
-        try std.testing.expect(set_one[0] == grid.at(0, 3).?);
-        try std.testing.expect(set_one[1] == grid.at(0, 4).?);
-        try std.testing.expect(set_one[2] == grid.at(0, 5).?);
+        try std.testing.expect(set_one[0] == grid.at(3, 0).?);
+        try std.testing.expect(set_one[1] == grid.at(4, 0).?);
+        try std.testing.expect(set_one[2] == grid.at(5, 0).?);
     }
     {
         var set_two = try st.getCellsOfSet(2);
         defer alctr.free(set_two);
 
         try std.testing.expect(set_two.len == 1);
-        try std.testing.expect(set_two[0] == grid.at(0, 6).?);
+        try std.testing.expect(set_two[0] == grid.at(6, 0).?);
     }
     {
         var set_three = try st.getCellsOfSet(3);
         defer alctr.free(set_three);
 
         try std.testing.expect(set_three.len == 1);
-        try std.testing.expect(set_three[0] == grid.at(0, 7).?);
+        try std.testing.expect(set_three[0] == grid.at(7, 0).?);
     }
     {
         var set_four = try st.getCellsOfSet(4);
@@ -246,9 +292,9 @@ test "state: merge" {
         var sets: [4]u32 = undefined;
 
         sets[0] = st.getSetOfCell(grid.at(0, 0).?);
-        sets[1] = st.getSetOfCell(grid.at(0, 1).?);
-        sets[2] = st.getSetOfCell(grid.at(0, 2).?);
-        sets[3] = st.getSetOfCell(grid.at(0, 3).?);
+        sets[1] = st.getSetOfCell(grid.at(1, 0).?);
+        sets[2] = st.getSetOfCell(grid.at(2, 0).?);
+        sets[3] = st.getSetOfCell(grid.at(3, 0).?);
 
         {
             var i: usize = 0;
@@ -262,13 +308,13 @@ test "state: merge" {
         }
 
         try st.merge(sets[0], sets[1]);
-        sets[1] = st.getSetOfCell(grid.at(0, 1).?);
+        sets[1] = st.getSetOfCell(grid.at(1, 0).?);
 
         try st.merge(sets[1], sets[2]);
-        sets[2] = st.getSetOfCell(grid.at(0, 2).?);
+        sets[2] = st.getSetOfCell(grid.at(2, 0).?);
 
         try st.merge(sets[2], sets[3]);
-        sets[3] = st.getSetOfCell(grid.at(0, 3).?);
+        sets[3] = st.getSetOfCell(grid.at(3, 0).?);
 
         {
             var i: usize = 0;
@@ -293,8 +339,8 @@ test "state: nextRow" {
 
     // internally generates 3 new sets
     const first = st.getSetOfCell(grid.at(0, 0).?);
-    _ = st.getSetOfCell(grid.at(0, 1).?);
-    _ = st.getSetOfCell(grid.at(0, 2).?);
+    _ = st.getSetOfCell(grid.at(1, 0).?);
+    _ = st.getSetOfCell(grid.at(2, 0).?);
 
     var nxt = try st.nextRow();
     defer nxt.deinit();
@@ -306,7 +352,7 @@ test "state: nextRow" {
 
     try std.testing.expect(first != second);
 
-    const third = st.getSetOfCell(grid.at(0, 3).?);
+    const third = st.getSetOfCell(grid.at(3, 0).?);
 
     try std.testing.expect(second == third);
 }
@@ -319,14 +365,14 @@ test "state: sortedSets" {
     var st = try State(SquareGrid).init(alctr, grid.width, 0);
     defer st.deinit();
 
-    st.record(0, grid.at(0, 5).?);
-    st.record(0, grid.at(0, 4).?);
-    st.record(0, grid.at(0, 3).?);
-    st.record(1, grid.at(0, 2).?);
-    st.record(1, grid.at(0, 1).?);
+    st.record(0, grid.at(5, 0).?);
+    st.record(0, grid.at(4, 0).?);
+    st.record(0, grid.at(3, 0).?);
+    st.record(1, grid.at(2, 0).?);
+    st.record(1, grid.at(1, 0).?);
     st.record(1, grid.at(0, 0).?);
-    st.record(2, grid.at(0, 6).?);
-    st.record(3, grid.at(0, 7).?);
+    st.record(2, grid.at(6, 0).?);
+    st.record(3, grid.at(7, 0).?);
 
     var sorted = try st.sortedSets();
     defer sorted.deinit();
@@ -373,4 +419,38 @@ test "state: sortedSets" {
     }
 
     try std.testing.expect(sorted.next() == null);
+}
+
+test "end to end" {
+    var alloc = std.testing.allocator;
+    var g = try SquareGrid.init(std.testing.allocator, 0, 8, 8);
+    defer g.deinit();
+
+    try Ellers.on(&g);
+
+    const s = try g.makeString();
+    defer alloc.free(s);
+
+    const m =
+        \\+---+---+---+---+---+---+---+---+
+        \\|                           |   |
+        \\+   +---+   +   +---+   +---+   +
+        \\|       |   |       |           |
+        \\+   +---+   +   +---+---+---+   +
+        \\|   |       |               |   |
+        \\+   +   +   +---+---+---+---+   +
+        \\|   |   |   |   |           |   |
+        \\+   +---+---+   +---+   +---+   +
+        \\|   |   |   |       |           |
+        \\+   +   +   +---+   +---+---+---+
+        \\|       |   |   |           |   |
+        \\+   +---+   +   +   +---+   +   +
+        \\|               |   |   |   |   |
+        \\+---+   +   +   +---+   +   +   +
+        \\|       |   |                   |
+        \\+---+---+---+---+---+---+---+---+
+        \\
+    ;
+
+    try std.testing.expectEqualStrings(m, s);
 }

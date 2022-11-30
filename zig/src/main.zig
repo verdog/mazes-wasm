@@ -17,7 +17,7 @@ const Options = struct {
     seed: u64 = 0,
     width: u32 = 8,
     height: u32 = 8,
-    scale: usize = 8,
+    scale: usize = 64,
     inset: f64 = 0,
     type: [64]u8 = u.strBuf(64, "recursivebacktracker"),
     viz: Vizualization = .heat,
@@ -276,17 +276,20 @@ pub fn main() !void {
                 else => {},
             }
             if (refresh) {
-                maze_qan.deinit();
-                sdl_tex.destroy();
                 heap.deinit();
-
                 heap = std.heap.ArenaAllocator.init(std.heap.page_allocator);
                 opts.newSeed();
 
-                maze_qan = try dispatch(opts, heap.allocator());
-                sdl2.c.SDL_SetWindowSize(sdl_window.ptr, @intCast(c_int, maze_qan.width), @intCast(c_int, maze_qan.height));
+                blk: {
+                    var next_maze_qan = dispatch(opts, heap.allocator()) catch |e| {
+                        std.debug.print("An error occured: {}\nPlease pick different settings.\n", .{e});
+                        break :blk;
+                    };
 
-                sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
+                    maze_qan = next_maze_qan;
+                    sdl2.c.SDL_SetWindowSize(sdl_window.ptr, @intCast(c_int, maze_qan.width), @intCast(c_int, maze_qan.height));
+                    sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
+                }
             }
         }
 

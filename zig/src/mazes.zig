@@ -12,6 +12,7 @@ pub const kruskals = @import("kruskals.zig").Kruskals;
 pub const growingtree = @import("growing_tree.zig").GrowingTree;
 pub const growingtreespindly = @import("growing_tree.zig").GrowingTreeSpindly;
 pub const growingtreemixed = @import("growing_tree.zig").GrowingTreeMixed;
+pub const ellers = @import("ellers.zig").Ellers;
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
@@ -39,6 +40,7 @@ pub fn onByName(name: []const u8, grid: anytype) !void {
     if (@TypeOf(grid) == *SquareGrid) {
         if (eq(u8, name, "sidewinder")) return try sidewinder.on(grid);
         if (eq(u8, name, "binarytree")) return try binarytree.on(grid);
+        if (eq(u8, name, "ellers")) return try ellers.on(grid);
     }
 
     if (@TypeOf(grid) == *SquareGrid or @TypeOf(grid) == *WeaveGrid) {
