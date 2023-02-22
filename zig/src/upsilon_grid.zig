@@ -284,7 +284,7 @@ pub const UpsilonGrid = struct {
 
     fn prepareGrid(self: *UpsilonGrid) !void {
         self.cells_buf = try self.alctr.alloc(UpsilonCell, self.width * self.height);
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             cell.* = UpsilonCell.init(self, x, y);

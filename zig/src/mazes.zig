@@ -13,6 +13,7 @@ pub const growingtree = @import("growing_tree.zig").GrowingTree;
 pub const growingtreespindly = @import("growing_tree.zig").GrowingTreeSpindly;
 pub const growingtreemixed = @import("growing_tree.zig").GrowingTreeMixed;
 pub const ellers = @import("ellers.zig").Ellers;
+pub const recursivedivision = @import("recursive_division.zig").RecursiveDivision;
 
 pub const Qanvas = @import("qanvas.zig").Qanvas;
 
@@ -41,6 +42,7 @@ pub fn onByName(name: []const u8, grid: anytype) !void {
         if (eq(u8, name, "sidewinder")) return try sidewinder.on(grid);
         if (eq(u8, name, "binarytree")) return try binarytree.on(grid);
         if (eq(u8, name, "ellers")) return try ellers.on(grid);
+        if (eq(u8, name, "recursivedivision")) return try recursivedivision.on(grid);
     }
 
     if (@TypeOf(grid) == *SquareGrid or @TypeOf(grid) == *WeaveGrid) {
@@ -102,6 +104,7 @@ test "Test mazes" {
     _ = @import("kruskals.zig");
     _ = @import("growing_tree.zig");
     _ = @import("ellers.zig");
+    _ = @import("recursive_division.zig");
 }
 
 fn test_getGrid(comptime GridT: type) !GridT {

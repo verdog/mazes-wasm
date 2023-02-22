@@ -280,7 +280,7 @@ pub const TriGrid = struct {
 
     fn prepareGrid(self: *TriGrid) !void {
         self.cells_buf = try self.alctr.alloc(TriCell, self.width * self.height);
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             cell.* = TriCell.init(self, x, y);

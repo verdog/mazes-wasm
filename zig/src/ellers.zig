@@ -84,7 +84,7 @@ pub fn State(comptime GridT: type) type {
 
             pub fn init(alctr: std.mem.Allocator, cells: []CellSetInfo) !@This() {
                 var sorted = try alctr.alloc(*CellSetInfo, cells.len);
-                for (cells) |*cell, i| {
+                for (cells, 0..) |*cell, i| {
                     sorted[i] = cell;
                 }
 
@@ -169,7 +169,7 @@ pub const Ellers = struct {
                     defer it.deinit();
                     while (it.next()) |set| {
                         grid.prng.random().shuffle(*State(@TypeOf(grid.*)).CellSetInfo, set);
-                        for (set) |info, i| {
+                        for (set, 0..) |info, i| {
                             const pick = grid.prng.random().intRangeLessThan(usize, 0, 3);
                             if (i == 0 or pick == 0) {
                                 try info.cell.?.bLink(info.cell.?.south().?);
@@ -384,7 +384,7 @@ test "state: sortedSets" {
 
     if (sorted.next()) |block| {
         try std.testing.expect(block.len == block_one.len);
-        for (block) |info, i| {
+        for (block, 0..) |info, i| {
             try std.testing.expect(info.set.? == block_one[i]);
         }
     } else {
@@ -393,7 +393,7 @@ test "state: sortedSets" {
 
     if (sorted.next()) |block| {
         try std.testing.expect(block.len == block_two.len);
-        for (block) |info, i| {
+        for (block, 0..) |info, i| {
             try std.testing.expect(info.set.? == block_two[i]);
         }
     } else {
@@ -402,7 +402,7 @@ test "state: sortedSets" {
 
     if (sorted.next()) |block| {
         try std.testing.expect(block.len == block_three.len);
-        for (block) |info, i| {
+        for (block, 0..) |info, i| {
             try std.testing.expect(info.set.? == block_three[i]);
         }
     } else {
@@ -411,7 +411,7 @@ test "state: sortedSets" {
 
     if (sorted.next()) |block| {
         try std.testing.expect(block.len == block_four.len);
-        for (block) |info, i| {
+        for (block, 0..) |info, i| {
             try std.testing.expect(info.set.? == block_four[i]);
         }
     } else {

@@ -355,7 +355,7 @@ pub const SquareGrid = struct {
 
     fn prepareGrid(self: *SquareGrid) !void {
         self.cells_buf = try self.alctr.alloc(SquareCell, self.width * self.height);
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             cell.* = SquareCell.init(self, y, x);
@@ -363,7 +363,7 @@ pub const SquareGrid = struct {
     }
 
     fn configureCells(self: *SquareGrid) void {
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             if (y > 0) cell.neighbors_buf[0] = self.at(x, y -| 1);

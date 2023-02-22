@@ -39,7 +39,7 @@ const Options = struct {
     pub fn parse(opts: *Options, argv: anytype) !void {
         for (argv) |sarg| {
             const eq = std.mem.eql;
-            const arg = std.mem.span(sarg);
+            const arg = std.mem.sliceTo(sarg, '0');
 
             // flags
             if (eq(u8, "--text", arg)) {

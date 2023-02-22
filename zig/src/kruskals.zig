@@ -54,7 +54,7 @@ fn State(comptime GridT: type) type {
                 s.neighbor_pairs = s.neighbor_pairs_buf;
             }
 
-            for (s.cell_setinfo_buf) |*info, i| {
+            for (s.cell_setinfo_buf, 0..) |*info, i| {
                 const x = @intCast(u32, (i % s.grid.size()) % grid.width);
                 const y = @intCast(u32, @divTrunc(i % s.grid.size(), grid.width));
                 const cell = grid.at(x, y).?;
@@ -207,7 +207,7 @@ test "state: init/deinit" {
     var s = try State(@TypeOf(g)).init(&g);
     defer s.deinit();
 
-    for (s.neighbor_pairs_buf) |pair, i| {
+    for (s.neighbor_pairs_buf, 0..) |pair, i| {
         errdefer std.debug.print("Failing index: {}\n", .{i});
         try std.testing.expect(g.at(pair.@"0".x(), pair.@"1".y()) != null);
     }

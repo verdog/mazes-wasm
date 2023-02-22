@@ -13,7 +13,7 @@ pub const Wilson = struct {
         defer grid.alctr.free(visited);
 
         // init
-        for (grid.cells_buf) |cell, i| {
+        for (grid.cells_buf, 0..) |cell, i| {
             visited[i] = cell.numLinks() > 0;
         }
         if (std.mem.indexOfScalar(bool, visited, true) == null) {

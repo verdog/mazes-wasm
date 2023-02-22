@@ -25,7 +25,7 @@ pub const Qanvas = struct {
 
         const grid_scale = 16;
 
-        for (q.buf) |*qix, i| {
+        for (q.buf, 0..) |*qix, i| {
             const row = @divTrunc(@divTrunc(i, width), grid_scale);
             const col = @divTrunc(i % width, grid_scale);
             if (row & 1 == col & 1) {
@@ -126,7 +126,7 @@ test "Construct/Destruct Qanvas" {
     var alloc = std.testing.allocator;
     var q = try Qanvas.init(alloc, 1024, 1024);
 
-    for (q.buf) |qix, i| {
+    for (q.buf, 0..) |qix, i| {
         const row = @divTrunc(@divTrunc(i, q.width), 16);
         const col = @divTrunc(i % q.width, 16);
         if (row & 1 == col & 1) {

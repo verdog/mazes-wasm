@@ -349,7 +349,7 @@ pub const HexGrid = struct {
 
     fn prepareGrid(self: *HexGrid) !void {
         self.cells_buf = try self.alctr.alloc(HexCell, self.width * self.height);
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             cell.* = HexCell.init(self, x, y);

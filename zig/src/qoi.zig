@@ -278,7 +278,7 @@ pub fn encode(buffer: []Qixel(RGB), alloc: std.mem.Allocator, width: u32, height
 
         try writeCursor(&result, alloc, &i, Chunks.Header.init(width, height, channels, colorspace));
 
-        for (buffer) |qix, j| {
+        for (buffer, 0..) |qix, j| {
             // priority:
             // 1. run
             // 2. index

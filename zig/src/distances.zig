@@ -103,7 +103,7 @@ pub fn Distances(comptime GridT: type) type {
             var dist: u32 = 0;
             var cell = this.root;
 
-            for (this.dists) |mdist, i| {
+            for (this.dists, 0..) |mdist, i| {
                 if (mdist) |entry| {
                     if (entry > dist) {
                         dist = entry;

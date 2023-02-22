@@ -46,7 +46,7 @@ pub const WeaveGrid = struct {
         for (self.under_cells_buf) |*cell| {
             cell.* = undefined;
         }
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             cell.* = WeaveCell{ .over = WeaveOverCell.init(self, y, x) };
@@ -54,7 +54,7 @@ pub const WeaveGrid = struct {
     }
 
     fn configureCells(self: *This) void {
-        for (self.cells_buf) |*cell, i| {
+        for (self.cells_buf, 0..) |*cell, i| {
             var x = @intCast(u32, i % self.width);
             var y = @intCast(u32, @divTrunc(i, self.width));
             if (y > 0) cell.over.neighbors_buf[0] = self.at(x, y -| 1);
@@ -415,7 +415,7 @@ pub const WeaveCell = union(enum) {
         switch (self) {
             .over => {
                 var i: usize = 0;
-                for (self.over.neighbors_buf) |mnei, j| {
+                for (self.over.neighbors_buf, 0..) |mnei, j| {
                     if (mnei) |nei| {
                         if (j < 4 or j >= 8) {
                             // cells one unit away
@@ -734,7 +734,9 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, draw_background: bool, scale: us
             if (walls) {
                 const wall: qoi.Qixel(qoi.RGB) =
                     if (!draw_background)
-                .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } } else .{ .colors = .{ .red = 12, .green = 11, .blue = 11 } };
+                    .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } }
+                else
+                    .{ .colors = .{ .red = 12, .green = 11, .blue = 11 } };
 
                 // zig fmt: off
                 if (cell.north() != null and cell.isLinked(cell.north().?)
