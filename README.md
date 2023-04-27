@@ -1,5 +1,20 @@
-http://www.mazesforprogrammers.com/ implemented in haxe and zig.
+Maze generator in zig/SDL2.
 
-![](./zig/img/demo.gif)
+![](./img/demo.gif)
 
-See more at https://dogspluspl.us/img/
+## Building
+
+First, update submodules:
+```
+git submodule update --init
+```
+
+Then:
+```
+zig build
+```
+
+or
+```
+zig build -Drelease-fast
+```
