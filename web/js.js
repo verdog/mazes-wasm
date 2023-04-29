@@ -1,26 +1,31 @@
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+// const canvas = document.getElementById("canvas");
+// const ctx = canvas.getContext("2d");
+//
+// ctx.fillStyle = "green";
+// ctx.fillRect(0, 0, 2, 2);
 
-ctx.fillStyle = "green";
-ctx.fillRect(0, 0, 2, 2);
+const blob = await WebAssembly.compileStreaming(fetch("./zig-out/lib/masm.wasm"));
 
 const {
-  exports: { memory }
-} = WebAssembly.instantiateStreaming(fetch("./zig-out/lib/spike.wasm"), {
+  exports: { memory, gen },
+} = await WebAssembly.instantiate(blob, {
   env: {
-    jprint: (ptr, len) => {
-      console.debug(decodeString(ptr, len));
+    consoleDebug: (ptr, len) => {
+        const s = decodeString(ptr, len);
+        console.log(s);
     }
-  }}).then((results) => {
-    main();
+  }
 });
 
 const decodeString = (ptr, length) => {
   const slice = new Uint8Array(
-    memory, // memory exported from Zig
+    memory.buffer,
     ptr,
     length
   );
   return new TextDecoder().decode(slice);
 };
 
+window.go = () => {
+  gen();
+};

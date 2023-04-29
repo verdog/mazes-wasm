@@ -350,7 +350,7 @@ pub const SquareGrid = struct {
 
     /// return the amount of cells in the grid
     pub fn size(self: SquareGrid) usize {
-        return self.width *| self.height;
+        return self.width * self.height;
     }
 
     fn prepareGrid(self: *SquareGrid) !void {
