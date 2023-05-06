@@ -166,7 +166,7 @@ pub const WeaveGrid = struct {
 
     /// return the amount of cells in the grid
     pub fn size(self: This) usize {
-        return self.width *| self.height;
+        return self.width * self.height;
     }
 
     pub fn tunnelUnder(self: *This, cell: *CellT) void {

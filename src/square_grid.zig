@@ -641,6 +641,102 @@ pub const SquareGrid = struct {
         if (inset_percent > 0) return self.makeQanvasInset(walls, scale, inset_percent);
         return self.makeQanvasNoInset(walls, scale);
     }
+
+    pub fn writeCanvasInset(
+        self: SquareGrid,
+        walls: bool,
+        scale: usize,
+        inset_percent: f64,
+        canvas_like: anytype,
+    ) !void {
+        const cell_size = @intCast(u32, scale);
+        const border_size = cell_size / 2;
+        const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
+
+        // black
+        const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
+        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+
+        var max = if (self.distances) |dists| dists.max() else null;
+
+        canvas_like.clear(background);
+
+        // background
+        for (self.cells_buf) |*cell| {
+            const x1 = cell.x() * cell_size + border_size;
+            const y1 = cell.y() * cell_size + border_size;
+            const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
+            if (self.distances) |dists| {
+                if (dists.get(cell)) |thedist| {
+                    // zig fmt: off
+                    const color = path_low.lerp(path_hi,
+                        @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
+                                               ).to(qoi.RGB);
+                    // zig fmt: on
+
+                    // center
+                    canvas_like.fill(color, coords.x2, coords.x3, coords.y2, coords.y3);
+
+                    if (cell.north() != null and cell.isLinked(cell.north().?)) {
+                        canvas_like.fill(color, coords.x2, coords.x3, coords.y1, coords.y2);
+                    }
+
+                    if (cell.south() != null and cell.isLinked(cell.south().?)) {
+                        canvas_like.fill(color, coords.x2, coords.x3, coords.y3, coords.y4);
+                    }
+
+                    if (cell.east() != null and cell.isLinked(cell.east().?)) {
+                        canvas_like.fill(color, coords.x3, coords.x4, coords.y2, coords.y3);
+                    }
+
+                    if (cell.west() != null and cell.isLinked(cell.west().?)) {
+                        canvas_like.fill(color, coords.x1, coords.x2, coords.y2, coords.y3);
+                    }
+                }
+            }
+        }
+
+        // walls
+        if (walls) {
+            const wall: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 127, .green = 115, .blue = 115 } };
+
+            for (self.cells_buf) |*cell| {
+                const x1 = cell.x() * cell_size + border_size;
+                const y1 = cell.y() * cell_size + border_size;
+                const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
+
+                if (cell.north() != null and cell.isLinked(cell.north().?)) {
+                    canvas_like.line(wall, coords.x2, coords.x2, coords.y1, coords.y2);
+                    canvas_like.line(wall, coords.x3, coords.x3, coords.y1, coords.y2);
+                } else {
+                    canvas_like.line(wall, coords.x2, coords.x3 + 1, coords.y2, coords.y2);
+                }
+
+                if (cell.south() != null and cell.isLinked(cell.south().?)) {
+                    canvas_like.line(wall, coords.x2, coords.x2, coords.y3, coords.y4);
+                    canvas_like.line(wall, coords.x3, coords.x3, coords.y3, coords.y4);
+                } else {
+                    canvas_like.line(wall, coords.x2, coords.x3 + 1, coords.y3, coords.y3);
+                }
+
+                if (cell.east() != null and cell.isLinked(cell.east().?)) {
+                    canvas_like.line(wall, coords.x3, coords.x4, coords.y2, coords.y2);
+                    canvas_like.line(wall, coords.x3, coords.x4, coords.y3, coords.y3);
+                } else {
+                    canvas_like.line(wall, coords.x3, coords.x3, coords.y2, coords.y3);
+                }
+
+                if (cell.west() != null and cell.isLinked(cell.west().?)) {
+                    canvas_like.line(wall, coords.x1, coords.x2, coords.y2, coords.y2);
+                    canvas_like.line(wall, coords.x1, coords.x2, coords.y3, coords.y3);
+                } else {
+                    canvas_like.line(wall, coords.x2, coords.x2, coords.y2, coords.y3);
+                }
+            }
+        }
+    }
 };
 
 test "Grid.makeString() returns a perfect, closed grid before modification" {

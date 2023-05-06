@@ -7,7 +7,7 @@ const qoi = @import("qoi.zig");
 const sdl2 = @import("sdl2"); // TODO remove; make independent encoder fns
 const Allocator = std.mem.Allocator;
 
-const Qixel = qoi.Qixel;
+pub const Qixel = qoi.Qixel;
 
 pub const Qanvas = struct {
     width: u32,
