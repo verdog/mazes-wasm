@@ -1,6 +1,6 @@
 Maze generator in zig/SDL2.
 
-![](./img/demo.gif)
+![](https://dogspluspl.us/mazeme/demo.mp4)
 
 ## Building
 
