@@ -257,7 +257,7 @@ pub const SquareGrid = struct {
             .prng = try alctr.create(std.rand.DefaultPrng),
         };
 
-        g.prng.* = std.rand.DefaultPrng.init(seed);
+        g.setSeed(seed);
 
         try g.prepareGrid();
         g.configureCells();
@@ -645,6 +645,7 @@ pub const SquareGrid = struct {
     pub fn writeCanvasInset(
         self: SquareGrid,
         walls: bool,
+        bg: bool,
         scale: usize,
         inset_percent: f64,
         canvas_like: anytype,
@@ -664,35 +665,37 @@ pub const SquareGrid = struct {
         canvas_like.clear(background);
 
         // background
-        for (self.cells_buf) |*cell| {
-            const x1 = cell.x() * cell_size + border_size;
-            const y1 = cell.y() * cell_size + border_size;
-            const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
-            if (self.distances) |dists| {
-                if (dists.get(cell)) |thedist| {
-                    // zig fmt: off
+        if (bg) {
+            for (self.cells_buf) |*cell| {
+                const x1 = cell.x() * cell_size + border_size;
+                const y1 = cell.y() * cell_size + border_size;
+                const coords = cellCoordsWithInset(x1, y1, cell_size, inset);
+                if (self.distances) |dists| {
+                    if (dists.get(cell)) |thedist| {
+                        // zig fmt: off
                     const color = path_low.lerp(path_hi,
                         @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
                                                ).to(qoi.RGB);
                     // zig fmt: on
 
-                    // center
-                    canvas_like.fill(color, coords.x2, coords.x3, coords.y2, coords.y3);
+                        // center
+                        canvas_like.fill(color, coords.x2, coords.x3, coords.y2, coords.y3);
 
-                    if (cell.north() != null and cell.isLinked(cell.north().?)) {
-                        canvas_like.fill(color, coords.x2, coords.x3, coords.y1, coords.y2);
-                    }
+                        if (cell.north() != null and cell.isLinked(cell.north().?)) {
+                            canvas_like.fill(color, coords.x2, coords.x3, coords.y1, coords.y2);
+                        }
 
-                    if (cell.south() != null and cell.isLinked(cell.south().?)) {
-                        canvas_like.fill(color, coords.x2, coords.x3, coords.y3, coords.y4);
-                    }
+                        if (cell.south() != null and cell.isLinked(cell.south().?)) {
+                            canvas_like.fill(color, coords.x2, coords.x3, coords.y3, coords.y4);
+                        }
 
-                    if (cell.east() != null and cell.isLinked(cell.east().?)) {
-                        canvas_like.fill(color, coords.x3, coords.x4, coords.y2, coords.y3);
-                    }
+                        if (cell.east() != null and cell.isLinked(cell.east().?)) {
+                            canvas_like.fill(color, coords.x3, coords.x4, coords.y2, coords.y3);
+                        }
 
-                    if (cell.west() != null and cell.isLinked(cell.west().?)) {
-                        canvas_like.fill(color, coords.x1, coords.x2, coords.y2, coords.y3);
+                        if (cell.west() != null and cell.isLinked(cell.west().?)) {
+                            canvas_like.fill(color, coords.x1, coords.x2, coords.y2, coords.y3);
+                        }
                     }
                 }
             }
@@ -736,6 +739,10 @@ pub const SquareGrid = struct {
                 }
             }
         }
+    }
+
+    pub fn setSeed(self: *SquareGrid, seed: u64) void {
+        self.prng.* = std.rand.DefaultPrng.init(seed);
     }
 };
 

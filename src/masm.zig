@@ -4,11 +4,12 @@ const std = @import("std");
 const Options = @import("Options.zig");
 
 var current_opts = Options{
-    .braid = 0.1,
-    .scale = 32 / 4,
-    .width = 24 * 4,
-    .height = 24 * 4,
+    .braid = 0,
+    .scale = 32,
+    .width = 24,
+    .height = 24,
     .qoi_walls = false,
+    .inset = 0.05,
 };
 
 var alctr = std.heap.page_allocator;
@@ -23,6 +24,75 @@ extern fn ctxFillRect(x: u32, y: u32, width: u32, height: u32) void;
 
 extern fn ctxStrokeStyle(ptr: [*]const u8, len: u32) void;
 extern fn ctxLine(x1: u32, x2: u32, y1: u32, y2: u32) void;
+
+// settings:
+
+export fn getWalls() bool {
+    return current_opts.qoi_walls;
+}
+
+export fn setWalls(checked: bool) void {
+    current_opts.qoi_walls = checked;
+}
+
+export fn setFillCells(checked: bool) void {
+    current_opts.qoi_bg = checked;
+}
+
+export fn getFillCells() bool {
+    return current_opts.qoi_bg;
+}
+
+export fn getSeed() u32 {
+    return @truncate(u32, current_opts.seed);
+}
+
+export fn setSeed(seed: u32) void {
+    current_opts.seed = seed;
+}
+
+export fn getWidth() u32 {
+    return current_opts.width;
+}
+
+export fn setWidth(width: u32) void {
+    current_opts.width = width;
+}
+
+export fn getHeight() u32 {
+    return current_opts.height;
+}
+
+export fn setHeight(height: u32) void {
+    current_opts.height = height;
+}
+
+export fn getScale() u32 {
+    return @truncate(u32, current_opts.scale);
+}
+
+export fn setScale(scale: u32) void {
+    current_opts.scale = scale;
+}
+
+export fn getBraid() f32 {
+    return @floatCast(f32, current_opts.braid);
+}
+
+export fn setBraid(braid: f32) void {
+    current_opts.braid = @floatCast(f64, braid);
+}
+
+export fn getInset() f32 {
+    return @floatCast(f32, current_opts.inset);
+}
+
+export fn setInset(inset: f32) void {
+    current_opts.inset = @floatCast(f64, inset);
+}
+
+// TODO gen type string
+// TODO grid (potentially requires porting of other grid draw funcs)
 
 fn jlog(str: []const u8) void {
     consoleDebug(str.ptr, str.len);
@@ -56,6 +126,9 @@ export fn gen() void {
     }
 
     {
+        // to preserve colors after changes to braid setting etc
+        grid.setSeed(current_opts.seed);
+
         jlog("Calcuating distances... ");
         grid.distances = maze.Distances(Grid).from(&grid, grid.pickRandom()) catch unreachable;
     }
@@ -122,17 +195,16 @@ export fn gen() void {
             grid.width * cell_size + border_size * 2,
             grid.height * cell_size + border_size * 2,
         );
+
+        // to preserve colors after changes to braid setting etc
+        grid.setSeed(current_opts.seed);
+
         grid.writeCanvasInset(
             current_opts.qoi_walls,
+            current_opts.qoi_bg,
             current_opts.scale,
             current_opts.inset,
             &qanv,
         ) catch unreachable;
     }
-
-    current_opts.seed +%= 1;
-}
-
-export fn setSeed(seed: u32) void {
-    current_opts.seed = seed;
 }
