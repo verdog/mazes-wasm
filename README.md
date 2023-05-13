@@ -1,6 +1,8 @@
-Maze generator in zig/SDL2.
+Maze generator in zig/SDL2 ported to run in the browser/WASM.
 
-![](https://dogspluspl.us/mazeme/demo.mp4)
+Try it out at https://dogspluspl.us/mazeme!
+
+![](./web/demo.gif)
 
 ## Building
 
