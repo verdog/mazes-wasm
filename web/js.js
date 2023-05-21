@@ -148,3 +148,13 @@ options_inset.oninput = (_) => {
   setInset(options_inset.value);
   redraw();
 }
+
+window.redraw = redraw;
+window.setWalls = setWalls;
+window.setFillCells = setFillCells;
+window.setScale = setScale;
+window.setSeed = setSeed;
+window.setWidth = setWidth;
+window.setHeight = setHeight;
+window.setInset = setInset;
+window.setBraid = setBraid;

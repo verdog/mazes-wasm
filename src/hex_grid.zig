@@ -688,7 +688,7 @@ test "Hex cell link" {
     try std.testing.expect(b.isLinked(&a) == true);
 }
 
-test "Hex cell link" {
+test "Hex cell link 2" {
     var alloc = std.testing.allocator;
     var gr = try HexGrid.init(alloc, 0, 4, 4);
     defer gr.deinit();
