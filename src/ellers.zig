@@ -98,7 +98,7 @@ pub fn State(comptime GridT: type) type {
                     }
                 }.lt;
 
-                std.sort.sort(*CellSetInfo, sorted, {}, lt);
+                std.sort.block(*CellSetInfo, sorted, {}, lt);
 
                 return .{ .buf = sorted, .alctr = alctr, .i = 0, .i_value = sorted[0].set };
             }

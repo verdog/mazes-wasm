@@ -70,7 +70,7 @@ pub fn main() !void {
 
                         defer {
                             // clear buffer
-                            std.mem.set(u8, &command_buffer, 0);
+                            @memset(&command_buffer, 0);
                             command_cursor = 0;
                         }
 

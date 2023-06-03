@@ -46,7 +46,12 @@ pub fn Distances(comptime GridT: type) type {
 
                 for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
                     const total_weight = dists.get(cellptr).? + c.?.weight();
+
                     if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
+                        if (dists.get(c.?) != null) {
+                            std.debug.print("found better path: {} < {}\n", .{ total_weight, dists.get(c.?).? });
+                        }
+
                         try frontier.add(c.?);
                         try dists.put(c.?, total_weight);
                     }
