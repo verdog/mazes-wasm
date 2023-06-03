@@ -32,7 +32,7 @@ const Grid = enum {
 pub fn parse(opts: *@This(), argv: anytype) !void {
     for (argv) |sarg| {
         const eq = std.mem.eql;
-        const arg = std.mem.sliceTo(sarg, '0');
+        const arg = std.mem.sliceTo(sarg, '\x00');
 
         // flags
         if (eq(u8, "--text", arg)) {
