@@ -27,7 +27,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.addModule("sdl2", SDL.getWrapperModule());
     exe.linkSystemLibrary("sdl2_image");
 
-    _ = b.addInstallArtifact(exe);
+    b.installArtifact(exe);
 
     const lib = b.addSharedLibrary(.{
         .name = "masm",
@@ -45,7 +45,7 @@ pub fn build(b: *std.build.Builder) void {
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
-    _ = b.addInstallArtifact(lib);
+    b.installArtifact(lib);
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());

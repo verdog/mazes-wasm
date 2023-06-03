@@ -117,11 +117,11 @@ export fn gen() void {
     ) catch unreachable;
     defer grid.deinit();
 
-    jlog("Generating...");
+    std.log.info("Generating...", .{});
     maze.onByName(&current_opts.type, &grid) catch unreachable;
 
     if (current_opts.braid > 0) {
-        jlog("Braiding...");
+        std.log.info("Braiding...", .{});
         grid.braid(current_opts.braid) catch unreachable;
     }
 
@@ -129,12 +129,12 @@ export fn gen() void {
         // to preserve colors after changes to braid setting etc
         grid.setSeed(current_opts.seed);
 
-        jlog("Calcuating distances... ");
+        std.log.info("Calcuating distances...", .{});
         grid.distances = maze.Distances(Grid).from(&grid, grid.pickRandom()) catch unreachable;
     }
 
     {
-        jlog("Drawing image... ");
+        std.log.info("Drawing image... ", .{});
         const Qixel = @import("qanvas.zig").Qixel;
         const qoi = @import("qoi.zig");
 

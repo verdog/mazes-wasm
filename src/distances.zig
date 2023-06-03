@@ -23,7 +23,41 @@ pub fn Distances(comptime GridT: type) type {
             return d;
         }
 
-        pub fn from(grid: *GridT, cell: *GridT.CellT) !Distances(GridT) {
+        fn fromFloodFill(grid: *GridT, cell: *GridT.CellT) !Distances(GridT) {
+            var dists = try Distances(GridT).init(grid.alctr, grid, cell);
+            try dists.put(cell, cell.weight());
+
+            var backing_frontier_a = std.ArrayList(*GridT.CellT).init(dists.alloc);
+            var backing_frontier_b = std.ArrayList(*GridT.CellT).init(dists.alloc);
+            defer backing_frontier_a.deinit();
+            defer backing_frontier_b.deinit();
+
+            var frontier = &backing_frontier_a;
+            var next_frontier = &backing_frontier_b;
+
+            try next_frontier.append(cell);
+
+            while (next_frontier.items.len > 0) {
+                std.mem.swap(*@TypeOf(backing_frontier_a), &frontier, &next_frontier);
+
+                while (frontier.items.len > 0) {
+                    var cellptr = frontier.pop();
+
+                    for (std.mem.sliceTo(&cellptr.links(), null)) |c| {
+                        const total_weight = dists.get(cellptr).? + c.?.weight();
+
+                        if (dists.get(c.?) == null) {
+                            try next_frontier.append(c.?);
+                            try dists.put(c.?, total_weight);
+                        }
+                    }
+                }
+            }
+
+            return dists;
+        }
+
+        fn fromDjikstras(grid: *GridT, cell: *GridT.CellT) !Distances(GridT) {
             var dists = try Distances(GridT).init(grid.alctr, grid, cell);
             try dists.put(cell, cell.weight());
 
@@ -49,7 +83,7 @@ pub fn Distances(comptime GridT: type) type {
 
                     if (dists.get(c.?) == null or total_weight < dists.get(c.?).?) {
                         if (dists.get(c.?) != null) {
-                            std.debug.print("found better path: {} < {}\n", .{ total_weight, dists.get(c.?).? });
+                            std.log.info("found better path: {} < {}\n", .{ total_weight, dists.get(c.?).? });
                         }
 
                         try frontier.add(c.?);
@@ -59,6 +93,23 @@ pub fn Distances(comptime GridT: type) type {
             }
 
             return dists;
+        }
+
+        pub fn from(grid: *GridT, cell: *GridT.CellT) !Distances(GridT) {
+            const all_cells_have_same_weight = blk: {
+                var seen_weight = grid.at(0, 0).?.weight();
+                for (grid.cells_buf) |c| {
+                    if (c.weight() != seen_weight) break :blk false;
+                }
+                break :blk true;
+            };
+
+            if (all_cells_have_same_weight) {
+                std.log.info("All cells have same weight\n", .{});
+                return try Distances(GridT).fromFloodFill(grid, cell);
+            } else {
+                return try Distances(GridT).fromDjikstras(grid, cell);
+            }
         }
 
         pub fn deinit(this: *Self) void {
