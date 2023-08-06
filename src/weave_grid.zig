@@ -47,16 +47,16 @@ pub const WeaveGrid = struct {
             cell.* = undefined;
         }
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x = @as(u32, @intCast(i % self.width));
+            var y = @as(u32, @intCast(@divTrunc(i, self.width)));
             cell.* = WeaveCell{ .over = WeaveOverCell.init(self, y, x) };
         }
     }
 
     fn configureCells(self: *This) void {
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x: u32 = @intCast(i % self.width);
+            var y: u32 = @intCast(@divTrunc(i, self.width));
             if (y > 0) cell.over.neighbors_buf[0] = self.at(x, y -| 1);
             if (y < self.height - 1) cell.over.neighbors_buf[1] = self.at(x, y +| 1);
             if (x < self.width - 1) cell.over.neighbors_buf[2] = self.at(x +| 1, y);
@@ -341,7 +341,7 @@ pub const WeaveCell = union(enum) {
     /// return the number of cells this cell is linked to
     pub fn numLinks(self: This) u32 {
         return switch (self) {
-            .over => @intCast(u32, std.mem.count(bool, &self.over.linked, &.{true})),
+            .over => @intCast(std.mem.count(bool, &self.over.linked, &.{true})),
             .under => 2,
         };
     }
@@ -666,9 +666,9 @@ fn cellCoordsWithInset(x: u32, y: u32, cell_size: u32, inset: u32) struct {
 }
 
 pub fn makeQanvas(self: WeaveGrid, walls: bool, draw_background: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
-    const cell_size = @intCast(u32, scale);
+    const cell_size: u32 = @intCast(scale);
     const border_size = cell_size / 2;
-    const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
+    const inset = @as(u32, @intFromFloat(@as(f64, @floatFromInt(cell_size)) * inset_percent));
 
     const width = self.width * cell_size;
     const height = self.height * cell_size;
@@ -676,9 +676,9 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, draw_background: bool, scale: us
     var qanv = try qan.Qanvas.init(self.alctr, width + border_size * 2, height + border_size * 2);
 
     const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
-    const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+    const hue = @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 0, 360)));
     const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-    const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+    const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
     var max = if (self.distances) |dists| dists.max() else null;
 
@@ -696,7 +696,7 @@ pub fn makeQanvas(self: WeaveGrid, walls: bool, draw_background: bool, scale: us
                     if (dists.get(cell)) |thedist| {
                         // zig fmt: off
                     const color = path_low.lerp(path_hi,
-                        @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
+                        @as(f64,@floatFromInt( thedist)) / @as(f64,@floatFromInt( max.?.distance))
                                                ).to(qoi.RGB);
 
                     // center

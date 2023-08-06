@@ -17,7 +17,7 @@ pub const RecursiveDivision = struct {
 
     fn divide(grid: anytype, x: u32, y: u32, width: u32, height: u32) void {
         const pick = grid.prng.random().intRangeLessThan(u8, 0, 4) == 0;
-        const room_size = @divTrunc(std.math.min(grid.width, grid.height), 4) + 1;
+        const room_size = @divTrunc(@min(grid.width, grid.height), 4) + 1;
         if ((height < room_size and width < room_size and pick) or (width <= 1 or height <= 1)) return;
 
         if (height > width)

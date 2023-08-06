@@ -163,8 +163,8 @@ pub fn Distances(comptime GridT: type) type {
                 if (mdist) |entry| {
                     if (entry > dist) {
                         dist = entry;
-                        const x = @intCast(u32, (i % this.grid.width) % this.grid.width);
-                        const y = @intCast(u32, @divTrunc(i, this.grid.width) % this.grid.width);
+                        const x: u32 = @intCast((i % this.grid.width) % this.grid.width);
+                        const y: u32 = @intCast(@divTrunc(i, this.grid.width) % this.grid.width);
                         cell = this.grid.at(x, y).?;
                     }
                 }

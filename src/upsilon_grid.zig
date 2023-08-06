@@ -128,8 +128,8 @@ pub const UpsilonCell = struct {
 
     fn whichNeighbor(self: UpsilonCell, other: UpsilonCell) ?u8 {
         const vec = .{
-            .x = @intCast(i64, other.x()) - @intCast(i64, self.x()),
-            .y = @intCast(i64, other.y()) - @intCast(i64, self.y()),
+            .x = @as(i64, other.x()) - @as(i64, self.x()),
+            .y = @as(i64, other.y()) - @as(i64, self.y()),
         };
         const V = @TypeOf(vec);
 
@@ -285,8 +285,8 @@ pub const UpsilonGrid = struct {
     fn prepareGrid(self: *UpsilonGrid) !void {
         self.cells_buf = try self.alctr.alloc(UpsilonCell, self.width * self.height);
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x = @as(u32, @intCast(i % self.width));
+            var y = @as(u32, @intCast(@divTrunc(i, self.width)));
             cell.* = UpsilonCell.init(self, x, y);
         }
     }
@@ -403,11 +403,11 @@ fn getCoords(cell: UpsilonCell, border_size: f64, cell_width: f64) struct {
     uy3: u32,
     uy4: u32,
 } {
-    const x: f64 = @intToFloat(f64, cell.x()) * cell_width * 2 + border_size;
+    const x: f64 = @as(f64, @floatFromInt(cell.x())) * cell_width * 2 + border_size;
     const x2 = x + cell_width;
     const x3 = x + cell_width * 2;
     const x4 = x + cell_width * 3;
-    const y: f64 = @intToFloat(f64, cell.y()) * cell_width * 2 + border_size;
+    const y: f64 = @as(f64, @floatFromInt(cell.y())) * cell_width * 2 + border_size;
     const y2 = y + cell_width;
     const y3 = y + cell_width * 2;
     const y4 = y + cell_width * 3;
@@ -421,14 +421,14 @@ fn getCoords(cell: UpsilonCell, border_size: f64, cell_width: f64) struct {
         .y3 = y3,
         .y4 = y4,
 
-        .ux = @floatToInt(u32, x),
-        .ux2 = @floatToInt(u32, x2),
-        .ux3 = @floatToInt(u32, x3),
-        .ux4 = @floatToInt(u32, x4),
-        .uy = @floatToInt(u32, y),
-        .uy2 = @floatToInt(u32, y2),
-        .uy3 = @floatToInt(u32, y3),
-        .uy4 = @floatToInt(u32, y4),
+        .ux = @as(u32, @intFromFloat(x)),
+        .ux2 = @as(u32, @intFromFloat(x2)),
+        .ux3 = @as(u32, @intFromFloat(x3)),
+        .ux4 = @as(u32, @intFromFloat(x4)),
+        .uy = @as(u32, @intFromFloat(y)),
+        .uy2 = @as(u32, @intFromFloat(y2)),
+        .uy3 = @as(u32, @intFromFloat(y3)),
+        .uy4 = @as(u32, @intFromFloat(y4)),
     };
 }
 
@@ -441,10 +441,10 @@ pub fn makeQanvas(grid: UpsilonGrid, walls: bool, scale: usize) !qan.Qanvas {
     //
     // cell with is the width of the little sqaure
 
-    const cell_width = @intToFloat(f64, scale);
+    const cell_width: f64 = @floatFromInt(scale);
     const border_size: f64 = cell_width;
-    const img_width = @floatToInt(u32, (cell_width * 2 * @intToFloat(f64, grid.width)) + (border_size * 3));
-    const img_height = @floatToInt(u32, (cell_width * 2 * @intToFloat(f64, grid.height)) + (border_size * 3));
+    const img_width = @as(u32, @intFromFloat((cell_width * 2 * @as(f64, @floatFromInt(grid.width))) + (border_size * 3)));
+    const img_height = @as(u32, @intFromFloat((cell_width * 2 * @as(f64, @floatFromInt(grid.height))) + (border_size * 3)));
 
     var qanv = try qan.Qanvas.init(grid.alctr, img_width, img_height);
 
@@ -457,24 +457,24 @@ pub fn makeQanvas(grid: UpsilonGrid, walls: bool, scale: usize) !qan.Qanvas {
     if (grid.distances) |dists| {
         const max_dist = dists.max().distance;
 
-        const hue = @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue: f32 = @floatFromInt(grid.prng.random().intRangeLessThan(u16, 0, 360));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(grid.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         for (grid.cells_buf) |*cell| {
             const xy = getCoords(cell.*, border_size, cell_width);
             const cell_dist = dists.get(cell).?;
-            const non_eased_color_t = @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist);
+            const non_eased_color_t = @as(f64, @floatFromInt(cell_dist)) / @as(f64, @floatFromInt(max_dist));
             const color_t = -(std.math.cos(std.math.pi * non_eased_color_t) - 1) / 2;
             const color = path_low.lerp(path_hi, color_t).to(qoi.RGB);
 
             if (cell.isOctogon()) {
                 { // top trapezoid
                     var line: u32 = 0;
-                    while (line < @floatToInt(u32, cell_width)) : (line += 1) {
-                        const t = @intToFloat(f64, line) / cell_width;
-                        const left = @floatToInt(u32, u.lerp(xy.x2, xy.x, t));
-                        const right = @floatToInt(u32, u.lerp(xy.x3, xy.x4, t));
+                    while (line < @as(u32, @intFromFloat(cell_width))) : (line += 1) {
+                        const t = @as(f64, @floatFromInt(line)) / cell_width;
+                        const left = @as(u32, @intFromFloat(u.lerp(xy.x2, xy.x, t)));
+                        const right = @as(u32, @intFromFloat(u.lerp(xy.x3, xy.x4, t)));
                         const y = xy.uy + line;
                         try qanv.line(color, left, right, y, y);
                     }
@@ -484,10 +484,10 @@ pub fn makeQanvas(grid: UpsilonGrid, walls: bool, scale: usize) !qan.Qanvas {
                 }
                 { // bottom trapezoid
                     var line: u32 = 0;
-                    while (line < @floatToInt(u32, cell_width)) : (line += 1) {
-                        const t = @intToFloat(f64, line) / cell_width;
-                        const left = @floatToInt(u32, u.lerp(xy.x, xy.x2, t));
-                        const right = @floatToInt(u32, u.lerp(xy.x4, xy.x3, t));
+                    while (line < @as(u32, @intFromFloat(cell_width))) : (line += 1) {
+                        const t = @as(f64, @floatFromInt(line)) / cell_width;
+                        const left = @as(u32, @intFromFloat(u.lerp(xy.x, xy.x2, t)));
+                        const right = @as(u32, @intFromFloat(u.lerp(xy.x4, xy.x3, t)));
                         const y = xy.uy3 + line;
                         try qanv.line(color, left, right, y, y);
                     }

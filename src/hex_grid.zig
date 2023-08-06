@@ -350,8 +350,8 @@ pub const HexGrid = struct {
     fn prepareGrid(self: *HexGrid) !void {
         self.cells_buf = try self.alctr.alloc(HexCell, self.width * self.height);
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x = @as(u32, @truncate(i % self.width));
+            var y = @as(u32, @truncate(@divTrunc(i, self.width)));
             cell.* = HexCell.init(self, x, y);
         }
     }
@@ -446,10 +446,10 @@ pub const HexGrid = struct {
 };
 
 pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
-    const cell_size = @intCast(u32, scale); // radius
-    const fcell_size = @intToFloat(f64, cell_size);
+    const cell_size = @as(u32, @intCast(scale)); // radius
+    const fcell_size = @as(f64, @floatFromInt(cell_size));
     const b_size = fcell_size * @sqrt(3.0) / 2.0; // height from center
-    const ib_size = @floatToInt(u32, b_size);
+    const ib_size = @as(u32, @intFromFloat(b_size));
 
     const border_size = cell_size;
 
@@ -468,9 +468,9 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
     if (grid.distances) |dists| {
         const max_dist = dists.max().distance;
 
-        const hue = @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue = @as(f32, @floatFromInt(grid.prng.random().intRangeLessThan(u16, 0, 360)));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(grid.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         for (grid.cells_buf) |*cell| {
             const x_center = border_size + (cell_size) + (3 * cell.x() * cell_size / 2);
@@ -482,24 +482,24 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
             const x_near_east = x_center + cell_size / 2;
             const x_far_east = x_center + cell_size;
 
-            const y_north = @floatToInt(u32, @intToFloat(f64, y_center) - b_size);
-            const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
+            const y_north = @as(u32, @intFromFloat(@as(f64, @floatFromInt(y_center)) - b_size));
+            const y_south = @as(u32, @intFromFloat(@as(f64, @floatFromInt(y_center)) + b_size));
 
             if (dists.get(cell)) |cell_dist| {
-                const color = path_low.lerp(path_hi, @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist)).to(qoi.RGB);
+                const color = path_low.lerp(path_hi, @as(f64, @floatFromInt(cell_dist)) / @as(f64, @floatFromInt(max_dist))).to(qoi.RGB);
 
                 { // top trapezoid
                     const lines = y_center - y_north - 1;
                     var j: u32 = 0;
                     while (j < lines) : (j += 1) {
-                        const t = @intToFloat(f64, j) / @intToFloat(f64, lines);
-                        const fx_far_west = @intToFloat(f64, x_far_west);
-                        const fx_near_west = @intToFloat(f64, x_near_west);
-                        const fx_near_east = @intToFloat(f64, x_near_east);
-                        const fx_far_east = @intToFloat(f64, x_far_east);
+                        const t = @as(f64, @floatFromInt(j)) / @as(f64, @floatFromInt(lines));
+                        const fx_far_west = @as(f64, @floatFromInt(x_far_west));
+                        const fx_near_west = @as(f64, @floatFromInt(x_near_west));
+                        const fx_near_east = @as(f64, @floatFromInt(x_near_east));
+                        const fx_far_east = @as(f64, @floatFromInt(x_far_east));
 
-                        const x1 = @floatToInt(u32, u.lerp(fx_near_west, fx_far_west, t));
-                        const x2 = @floatToInt(u32, u.lerp(fx_near_east, fx_far_east, t) + 1);
+                        const x1 = @as(u32, @intFromFloat(u.lerp(fx_near_west, fx_far_west, t)));
+                        const x2 = @as(u32, @intFromFloat(u.lerp(fx_near_east, fx_far_east, t) + 1));
 
                         try qanv.line(color, x1, x2, y_north + j + 1, y_north + j + 1);
                     }
@@ -509,14 +509,14 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
                     const lines = y_south - y_center;
                     var j: u32 = 0;
                     while (j < lines) : (j += 1) {
-                        const t = @intToFloat(f64, j) / @intToFloat(f64, lines);
-                        const fx_far_west = @intToFloat(f64, x_far_west);
-                        const fx_near_west = @intToFloat(f64, x_near_west);
-                        const fx_near_east = @intToFloat(f64, x_near_east);
-                        const fx_far_east = @intToFloat(f64, x_far_east);
+                        const t = @as(f64, @floatFromInt(j)) / @as(f64, @floatFromInt(lines));
+                        const fx_far_west = @as(f64, @floatFromInt(x_far_west));
+                        const fx_near_west = @as(f64, @floatFromInt(x_near_west));
+                        const fx_near_east = @as(f64, @floatFromInt(x_near_east));
+                        const fx_far_east = @as(f64, @floatFromInt(x_far_east));
 
-                        const x1 = @floatToInt(u32, u.lerp(fx_far_west, fx_near_west, t));
-                        const x2 = @floatToInt(u32, u.lerp(fx_far_east, fx_near_east, t) + 1);
+                        const x1 = @as(u32, @intFromFloat(u.lerp(fx_far_west, fx_near_west, t)));
+                        const x2 = @as(u32, @intFromFloat(u.lerp(fx_far_east, fx_near_east, t) + 1));
 
                         try qanv.line(color, x1, x2, y_center + j, y_center + j);
                     }
@@ -537,8 +537,8 @@ pub fn makeQanvas(grid: HexGrid, walls: bool, scale: usize) !qan.Qanvas {
             const x_near_east = x_center + cell_size / 2;
             const x_far_east = x_center + cell_size;
 
-            const y_north = @floatToInt(u32, @intToFloat(f64, y_center) - b_size);
-            const y_south = @floatToInt(u32, @intToFloat(f64, y_center) + b_size);
+            const y_north = @as(u32, @intFromFloat(@as(f64, @floatFromInt(y_center)) - b_size));
+            const y_south = @as(u32, @intFromFloat(@as(f64, @floatFromInt(y_center)) + b_size));
             if (walls) {
                 if (cell.north() == null)
                     try qanv.line(wall_color, x_near_west, x_near_east, y_north, y_north);

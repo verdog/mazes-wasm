@@ -55,11 +55,11 @@ fn State(comptime GridT: type) type {
             }
 
             for (s.cell_setinfo_buf, 0..) |*info, i| {
-                const x = @intCast(u32, (i % s.grid.size()) % grid.width);
-                const y = @intCast(u32, @divTrunc(i % s.grid.size(), grid.width));
-                const cell = grid.at(x, y).?;
+                const x: u64 = @intCast((i % s.grid.size()) % @as(usize, grid.width));
+                const y: u64 = @divTrunc(i % s.grid.size(), @as(usize, grid.width));
+                const cell = grid.at(@truncate(x), @truncate(y)).?;
 
-                info.* = .{ .cell = cell, .set = @intCast(u32, i) };
+                info.* = .{ .cell = cell, .set = @as(u32, @truncate(i)) };
             }
 
             return s;
@@ -77,7 +77,7 @@ fn State(comptime GridT: type) type {
             const idx = blk: {
                 var i = self.grid.width * cell.y() + cell.x();
                 if (GridT == WeaveGrid and std.meta.activeTag(cell.*) == .under)
-                    i += @intCast(u32, self.grid.size());
+                    i += @truncate(self.grid.size());
                 break :blk i;
             };
 

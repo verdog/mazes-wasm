@@ -113,7 +113,7 @@ pub fn parse(opts: *@This(), argv: anytype) !void {
 }
 
 pub fn newSeed(this: *@This()) void {
-    this.seed = @byteSwap(@truncate(u64, @bitCast(u128, std.time.nanoTimestamp())));
+    this.seed = @byteSwap(@as(u64, @truncate(@as(u128, @bitCast(std.time.nanoTimestamp())))));
 }
 
 pub fn print(opt: @This(), writer: anytype) void {

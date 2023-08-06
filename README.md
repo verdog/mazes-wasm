@@ -6,6 +6,8 @@ Try it out at https://dogspluspl.us/mazeme!
 
 ## Building
 
+Use zig 0.11.0.
+
 First, update submodules:
 ```
 git submodule update --init

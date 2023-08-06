@@ -68,21 +68,21 @@ pub const Qanvas = struct {
 
         const dx = x_end - x_start;
         const dy = y_end - y_start;
-        const iters = std.math.max(try std.math.absInt(dx), try std.math.absInt(dy));
+        const iters = @max(try std.math.absInt(dx), try std.math.absInt(dy));
         var i: u32 = 0;
 
         while (i < iters) : (i += 1) {
-            var x = @intCast(usize, x_start + @divTrunc(i * dx, iters));
-            var y = @intCast(usize, y_start + @divTrunc(i * dy, iters));
+            var x: usize = @intCast(x_start + @divTrunc(i * dx, iters));
+            var y: usize = @intCast(y_start + @divTrunc(i * dy, iters));
             this.buf[y * this.width + x] = color;
         }
     }
 
     pub fn fill(this: Self, color: Qixel(qoi.RGB), x1: u32, x2: u32, y1: u32, y2: u32) !void {
-        const x_start = std.math.min(x1, x2);
-        const x_end = std.math.max(x1, x2);
-        var y_start = std.math.min(y1, y2);
-        const y_end = std.math.max(y1, y2);
+        const x_start = @min(x1, x2);
+        const x_end = @max(x1, x2);
+        var y_start = @min(y1, y2);
+        const y_end = @max(y1, y2);
 
         // TODO bounds checking
 
@@ -112,7 +112,7 @@ pub const Qanvas = struct {
     }
 
     pub fn encodeSdlUpdate(this: *Self, tex: *sdl2.Texture) !void {
-        try tex.update(@ptrCast(*[]u8, &this.buf).*, this.width * @sizeOf(Qixel(qoi.RGB)), null);
+        try tex.update(@as(*[]u8, @ptrCast(&this.buf)).*, this.width * @sizeOf(Qixel(qoi.RGB)), null);
     }
 
     const Self = @This();

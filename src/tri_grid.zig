@@ -119,13 +119,13 @@ pub const TriCell = struct {
 
     fn whichNeighbor(self: TriCell, other: TriCell) ?u8 {
         if (self.y() == other.y()) {
-            switch (@intCast(i64, other.x()) - @intCast(i64, self.x())) {
+            switch (@as(i64, other.x()) - @as(i64, self.x())) {
                 1 => return 1,
                 -1 => return 2,
                 else => return null,
             }
         } else if (self.x() == other.x()) {
-            switch (@intCast(i64, other.y()) - @intCast(i64, self.y())) {
+            switch (@as(i64, other.y()) - @as(i64, self.y())) {
                 1 => return if (self.isUpright()) 0 else null,
                 -1 => return if (!self.isUpright()) 0 else null,
                 else => return null,
@@ -281,8 +281,8 @@ pub const TriGrid = struct {
     fn prepareGrid(self: *TriGrid) !void {
         self.cells_buf = try self.alctr.alloc(TriCell, self.width * self.height);
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x: u32 = @intCast(i % self.width);
+            var y: u32 = @intCast(@divTrunc(i, self.width));
             cell.* = TriCell.init(self, x, y);
         }
     }
@@ -380,10 +380,10 @@ pub const TriGrid = struct {
 };
 
 fn getCoords(cell: TriCell, border_size: u32, tri_width: f64, tri_height: f64) struct { x_center: u32, y_center: u32, x_west: u32, x_east: u32, y_apex: u32, y_base: u32 } {
-    const x_center = border_size + @floatToInt(u32, tri_width / 2.0) + cell.x() * @floatToInt(u32, tri_width / 2.0);
-    const y_center = border_size + @floatToInt(u32, tri_height / 2.0) + cell.y() * @floatToInt(u32, tri_height);
-    const x_west = x_center - @floatToInt(u32, tri_width / 2.0);
-    const x_east = x_center + @floatToInt(u32, tri_width / 2.0);
+    const x_center = border_size + @as(u32, @intFromFloat(tri_width / 2.0)) + cell.x() * @as(u32, @intFromFloat(tri_width / 2.0));
+    const y_center = border_size + @as(u32, @intFromFloat(tri_height / 2.0)) + cell.y() * @as(u32, @intFromFloat(tri_height));
+    const x_west = x_center - @as(u32, @intFromFloat(tri_width / 2.0));
+    const x_east = x_center + @as(u32, @intFromFloat(tri_width / 2.0));
     return .{
         .x_center = x_center,
         .y_center = y_center,
@@ -391,24 +391,24 @@ fn getCoords(cell: TriCell, border_size: u32, tri_width: f64, tri_height: f64) s
         .x_east = x_east,
 
         .y_apex = if (cell.isUpright())
-            y_center - @floatToInt(u32, tri_height / 2.0)
+            y_center - @as(u32, @intFromFloat(tri_height / 2.0))
         else
-            y_center + @floatToInt(u32, tri_height / 2.0),
+            y_center + @as(u32, @intFromFloat(tri_height / 2.0)),
 
         .y_base = if (cell.isUpright())
-            y_center + @floatToInt(u32, tri_height / 2.0)
+            y_center + @as(u32, @intFromFloat(tri_height / 2.0))
         else
-            y_center - @floatToInt(u32, tri_height / 2.0),
+            y_center - @as(u32, @intFromFloat(tri_height / 2.0)),
     };
 }
 
 pub fn makeQanvas(grid: TriGrid, walls: bool, scale: usize) !qan.Qanvas {
-    const tri_width = @intToFloat(f64, scale); // length of side
+    const tri_width = @as(f64, @floatFromInt(scale)); // length of side
     const tri_height = tri_width * @sqrt(3.0) / 2.0;
 
-    const border_size = @floatToInt(u32, tri_width / 2);
-    const img_width: u32 = @floatToInt(u32, tri_width / 2.0) * (1 + grid.width) + border_size * 2;
-    const img_height: u32 = @floatToInt(u32, tri_height) * grid.height + border_size * 2;
+    const border_size = @as(u32, @intFromFloat(tri_width / 2));
+    const img_width: u32 = @as(u32, @intFromFloat(tri_width / 2.0)) * (1 + grid.width) + border_size * 2;
+    const img_height: u32 = @as(u32, @intFromFloat(tri_height)) * grid.height + border_size * 2;
 
     var qanv = try qan.Qanvas.init(grid.alctr, img_width, img_height);
 
@@ -422,35 +422,35 @@ pub fn makeQanvas(grid: TriGrid, walls: bool, scale: usize) !qan.Qanvas {
     if (grid.distances) |dists| {
         const max_dist = dists.max().distance;
 
-        const hue = @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue = @as(f32, @floatFromInt(grid.prng.random().intRangeLessThan(u16, 0, 360)));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, grid.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(grid.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         for (grid.cells_buf) |*cell| {
             const xy = getCoords(cell.*, border_size, tri_width, tri_height);
 
             if (dists.get(cell)) |cell_dist| {
-                const non_eased_color_t = @intToFloat(f64, cell_dist) / @intToFloat(f64, max_dist);
+                const non_eased_color_t = @as(f64, @floatFromInt(cell_dist)) / @as(f64, @floatFromInt(max_dist));
                 const color_t = -(std.math.cos(std.math.pi * non_eased_color_t) - 1) / 2;
                 const color = path_low.lerp(path_hi, color_t).to(qoi.RGB);
                 var line: u32 = 0;
-                while (line < @floatToInt(u32, tri_height)) : (line += 1) {
-                    const line_t = @intToFloat(f64, line) / tri_height;
-                    const fx_west = @intToFloat(f64, xy.x_west);
-                    const fx_center = @intToFloat(f64, xy.x_center);
-                    const fx_east = @intToFloat(f64, xy.x_east);
+                while (line < @as(u32, @intFromFloat(tri_height))) : (line += 1) {
+                    const line_t = @as(f64, @floatFromInt(line)) / tri_height;
+                    const fx_west = @as(f64, @floatFromInt(xy.x_west));
+                    const fx_center = @as(f64, @floatFromInt(xy.x_center));
+                    const fx_east = @as(f64, @floatFromInt(xy.x_east));
 
                     const x1 = if (cell.isUpright())
-                        @floatToInt(u32, u.lerp(fx_center, fx_west, line_t) + 0.5)
+                        @as(u32, @intFromFloat(u.lerp(fx_center, fx_west, line_t) + 0.5))
                     else
-                        @floatToInt(u32, u.lerp(fx_west, fx_center, line_t) + 0.5);
+                        @as(u32, @intFromFloat(u.lerp(fx_west, fx_center, line_t) + 0.5));
 
                     const x2 = if (cell.isUpright())
-                        @floatToInt(u32, u.lerp(fx_center, fx_east, line_t) + 0.5)
+                        @as(u32, @intFromFloat(u.lerp(fx_center, fx_east, line_t) + 0.5))
                     else
-                        @floatToInt(u32, u.lerp(fx_east, fx_center, line_t) + 0.5);
+                        @as(u32, @intFromFloat(u.lerp(fx_east, fx_center, line_t) + 0.5));
 
-                    const y = std.math.min(xy.y_apex, xy.y_base) + line;
+                    const y = @min(xy.y_apex, xy.y_base) + line;
 
                     try qanv.line(color, x1, x2, y, y);
                 }

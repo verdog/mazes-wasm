@@ -44,7 +44,7 @@ export fn getFillCells() bool {
 }
 
 export fn getSeed() u32 {
-    return @truncate(u32, current_opts.seed);
+    return @truncate(current_opts.seed);
 }
 
 export fn setSeed(seed: u32) void {
@@ -68,7 +68,7 @@ export fn setHeight(height: u32) void {
 }
 
 export fn getScale() u32 {
-    return @truncate(u32, current_opts.scale);
+    return @truncate(current_opts.scale);
 }
 
 export fn setScale(scale: u32) void {
@@ -76,19 +76,19 @@ export fn setScale(scale: u32) void {
 }
 
 export fn getBraid() f32 {
-    return @floatCast(f32, current_opts.braid);
+    return @floatCast(current_opts.braid);
 }
 
 export fn setBraid(braid: f32) void {
-    current_opts.braid = @floatCast(f64, braid);
+    current_opts.braid = @floatCast(braid);
 }
 
 export fn getInset() f32 {
-    return @floatCast(f32, current_opts.inset);
+    return @floatCast(current_opts.inset);
 }
 
 export fn setInset(inset: f32) void {
-    current_opts.inset = @floatCast(f64, inset);
+    current_opts.inset = @floatCast(inset);
 }
 
 // TODO gen type string
@@ -189,7 +189,7 @@ export fn gen() void {
             }
         }{};
 
-        const cell_size = @intCast(u32, current_opts.scale);
+        const cell_size: u32 = @intCast(current_opts.scale);
         const border_size = cell_size / 2;
         ctxSetSize(
             grid.width * cell_size + border_size * 2,

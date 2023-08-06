@@ -20,8 +20,6 @@ pub fn build(b: *std.build.Builder) void {
         .target = target,
         .optimize = mode,
     });
-    exe.emit_docs = .emit;
-    exe.setMainPkgPath("./src");
 
     SDL.link(exe, .dynamic);
     exe.addModule("sdl2", SDL.getWrapperModule());

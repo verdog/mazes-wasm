@@ -71,7 +71,7 @@ pub const SquareCell = struct {
 
     /// return the number of cells this cell is linked to
     pub fn numLinks(self: SquareCell) u32 {
-        return @intCast(u32, std.mem.count(bool, &self.linked, &.{true}));
+        return @intCast(std.mem.count(bool, &self.linked, &.{true}));
     }
 
     /// return an iterator over cells that `self` is linked to.
@@ -356,16 +356,16 @@ pub const SquareGrid = struct {
     fn prepareGrid(self: *SquareGrid) !void {
         self.cells_buf = try self.alctr.alloc(SquareCell, self.width * self.height);
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x: u32 = @intCast(i % self.width);
+            var y: u32 = @intCast(@divTrunc(i, self.width));
             cell.* = SquareCell.init(self, y, x);
         }
     }
 
     fn configureCells(self: *SquareGrid) void {
         for (self.cells_buf, 0..) |*cell, i| {
-            var x = @intCast(u32, i % self.width);
-            var y = @intCast(u32, @divTrunc(i, self.width));
+            var x: u32 = @intCast(i % self.width);
+            var y: u32 = @intCast(@divTrunc(i, self.width));
             if (y > 0) cell.neighbors_buf[0] = self.at(x, y -| 1);
             if (y < self.height - 1) cell.neighbors_buf[1] = self.at(x, y +| 1);
             if (x < self.width - 1) cell.neighbors_buf[2] = self.at(x +| 1, y);
@@ -446,7 +446,7 @@ pub const SquareGrid = struct {
     }
 
     fn makeQanvasNoInset(self: SquareGrid, walls: bool, scale: usize) !qan.Qanvas {
-        const cell_size = @intCast(u32, scale);
+        const cell_size: u32 = @intCast(scale);
         const border_size = cell_size / 2;
 
         const width = self.width * cell_size;
@@ -456,9 +456,9 @@ pub const SquareGrid = struct {
 
         // black
         const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
-        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue: f32 = @floatFromInt(self.prng.random().intRangeLessThan(u16, 0, 360));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         var max = if (self.distances) |dists| dists.max() else null;
 
@@ -473,7 +473,7 @@ pub const SquareGrid = struct {
 
             if (self.distances) |dists| {
                 if (dists.get(cell)) |thedist| {
-                    const color = path_low.lerp(path_hi, @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)).to(qoi.RGB);
+                    const color = path_low.lerp(path_hi, @as(f64, @floatFromInt(thedist)) / @as(f64, @floatFromInt(max.?.distance))).to(qoi.RGB);
 
                     try qanv.fill(color, x1, x2, y1, y2);
                 }
@@ -538,9 +538,9 @@ pub const SquareGrid = struct {
     }
 
     fn makeQanvasInset(self: SquareGrid, walls: bool, scale: usize, inset_percent: f64) !qan.Qanvas {
-        const cell_size = @intCast(u32, scale);
+        const cell_size: u32 = @intCast(scale);
         const border_size = cell_size / 2;
-        const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
+        const inset = @as(u32, @intFromFloat(@as(f64, @floatFromInt(cell_size)) * inset_percent));
 
         const width = self.width * cell_size;
         const height = self.height * cell_size;
@@ -549,9 +549,9 @@ pub const SquareGrid = struct {
 
         // black
         const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
-        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue = @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 0, 360)));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         var max = if (self.distances) |dists| dists.max() else null;
 
@@ -566,7 +566,7 @@ pub const SquareGrid = struct {
                 if (dists.get(cell)) |thedist| {
                     // zig fmt: off
                     const color = path_low.lerp(path_hi,
-                        @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
+                        @as(f64,@floatFromInt( thedist)) / @as(f64,@floatFromInt( max.?.distance))
                                                ).to(qoi.RGB);
                     // zig fmt: on
 
@@ -650,15 +650,15 @@ pub const SquareGrid = struct {
         inset_percent: f64,
         canvas_like: anytype,
     ) !void {
-        const cell_size = @intCast(u32, scale);
+        const cell_size = @as(u32, @intCast(scale));
         const border_size = cell_size / 2;
-        const inset = @floatToInt(u32, @intToFloat(f64, cell_size) * inset_percent);
+        const inset = @as(u32, @intFromFloat(@as(f64, @floatFromInt(cell_size)) * inset_percent));
 
         // black
         const background: qoi.Qixel(qoi.RGB) = .{ .colors = .{ .red = 10, .green = 10, .blue = 15 } };
-        const hue = @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 0, 360));
+        const hue = @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 0, 360)));
         const path_low = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = hue, .saturation = 0.55, .value = 0.65 }, .alpha = 255 };
-        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @intToFloat(f32, self.prng.random().intRangeLessThan(u16, 60, 180)), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
+        const path_hi = qoi.Qixel(qoi.HSV){ .colors = .{ .hue = @mod(hue + @as(f32, @floatFromInt(self.prng.random().intRangeLessThan(u16, 60, 180))), 360), .saturation = 0.65, .value = 0.20 }, .alpha = 255 };
 
         var max = if (self.distances) |dists| dists.max() else null;
 
@@ -674,7 +674,7 @@ pub const SquareGrid = struct {
                     if (dists.get(cell)) |thedist| {
                         // zig fmt: off
                     const color = path_low.lerp(path_hi,
-                        @intToFloat(f64, thedist) / @intToFloat(f64, max.?.distance)
+                        @as(f64,@floatFromInt( thedist)) / @as(f64,@floatFromInt( max.?.distance))
                                                ).to(qoi.RGB);
                     // zig fmt: on
 

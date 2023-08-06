@@ -109,9 +109,9 @@ pub fn main() !void {
                         }
                     } else {
                         const char: ?u8 = blk: {
-                            const num = @enumToInt(key.keycode);
+                            const num = @intFromEnum(key.keycode);
                             break :blk if (num & 0xff == num)
-                                @intCast(u8, num)
+                                @intCast(num)
                             else
                                 null;
                         };
@@ -139,7 +139,7 @@ pub fn main() !void {
                     };
 
                     maze_qan = next_maze_qan;
-                    sdl2.c.SDL_SetWindowSize(sdl_window.ptr, @intCast(c_int, maze_qan.width), @intCast(c_int, maze_qan.height));
+                    sdl2.c.SDL_SetWindowSize(sdl_window.ptr, @intCast(maze_qan.width), @intCast(maze_qan.height));
                     sdl_tex = try maze_qan.encodeSdl(sdl_renderer);
                 }
             }
@@ -231,7 +231,7 @@ fn run(comptime Grid: type, opt: Options, alloc: std.mem.Allocator) !qan.Qanvas 
         var deadends = try grid.deadends();
         defer grid.alctr.free(deadends);
         var time = timer.read();
-        std.debug.print("- {} dead ends ({d}%) (Calculated in {} microseconds)\n", .{ deadends.len, @intToFloat(f64, deadends.len) / @intToFloat(f64, grid.size()) * 100, time / 1000 });
+        std.debug.print("- {} dead ends ({d}%) (Calculated in {} microseconds)\n", .{ deadends.len, @as(f64, @floatFromInt(deadends.len)) / @as(f64, @floatFromInt(grid.size())) * 100, time / 1000 });
     }
 
     if (grid.distances) |dists| {

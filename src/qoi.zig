@@ -45,9 +45,9 @@ pub const HSV = struct {
         dhue = @mod(dhue + 180, 360) - 180;
 
         return .{
-            .hue = @mod(@floatCast(f32, u.lerp(this.hue, this.hue + dhue, t)), 360),
-            .saturation = @floatCast(f32, u.lerp(this.saturation, other.saturation, t)),
-            .value = @floatCast(f32, u.lerp(this.value, other.value, t)),
+            .hue = @mod(@as(f32, @floatCast(u.lerp(this.hue, this.hue + dhue, t))), 360),
+            .saturation = @as(f32, @floatCast(u.lerp(this.saturation, other.saturation, t))),
+            .value = @as(f32, @floatCast(u.lerp(this.value, other.value, t))),
         };
     }
 
@@ -69,13 +69,13 @@ pub const HSV = struct {
                 };
                 const x = chroma * (1 - component);
 
-                const uchroma = @floatToInt(u8, chroma * 256);
-                const ux = @floatToInt(u8, x * 256);
+                const uchroma: u8 = @intFromFloat(chroma * 256);
+                const ux: u8 = @intFromFloat(x * 256);
 
                 var rgb =
                     if (hprime < 1) RGB{ .red = uchroma, .green = ux, .blue = 0 } else if (hprime < 2) RGB{ .red = ux, .green = uchroma, .blue = 0 } else if (hprime < 3) RGB{ .red = 0, .green = uchroma, .blue = ux } else if (hprime < 4) RGB{ .red = 0, .green = ux, .blue = uchroma } else if (hprime < 5) RGB{ .red = ux, .green = 0, .blue = uchroma } else if (hprime < 6) RGB{ .red = uchroma, .green = 0, .blue = ux } else unreachable;
 
-                const m = @floatToInt(u8, hsv.value * 256) - uchroma;
+                const m = @as(u8, @intFromFloat(hsv.value * 256)) - uchroma;
                 rgb.red += m;
                 rgb.green += m;
                 rgb.blue += m;
@@ -115,7 +115,7 @@ pub fn Qixel(comptime Space: type) type {
 
 pub const Chunks = struct {
     pub const Header = packed struct {
-        magic: u32 = @bitCast(u32, @as([4]u8, .{ 'q', 'o', 'i', 'f' })),
+        magic: u32 = @bitCast(@as([4]u8, .{ 'q', 'o', 'i', 'f' })),
         /// stored in big endian
         width: u32,
         /// stored in big endian
@@ -202,7 +202,7 @@ pub const Chunks = struct {
         magic: u2 = 0b10,
 
         pub fn init(dr: i4, dg: i6, db: i4) [2]u8 {
-            var l = Luma{ .dr = @intCast(u4, @as(i5, dr) + 8), .dg = @intCast(u6, @as(i7, dg) + 32), .db = @intCast(u4, @as(i5, db) + 8) };
+            var l = Luma{ .dr = @as(u4, @intCast(@as(i5, dr) + 8)), .dg = @as(u6, @intCast(@as(i7, dg) + 32)), .db = @as(u4, @intCast(@as(i5, db) + 8)) };
             return .{ (@as(u8, l.magic) << 6) | l.dg, (@as(u8, l.dr) << 4) | l.db };
         }
     };
@@ -219,7 +219,7 @@ pub const Chunks = struct {
         }
     };
 
-    pub const Tailer = packed struct { magic: u64 = @bitCast(u64, @as([8]u8, .{ 0, 0, 0, 0, 0, 0, 0, 1 })) };
+    pub const Tailer = packed struct { magic: u64 = @bitCast(@as([8]u8, .{ 0, 0, 0, 0, 0, 0, 0, 1 })) };
 };
 
 fn sizeOnDisk(comptime T: type) usize {
@@ -243,13 +243,13 @@ fn writeCursor(buffer: *[]u8, alloc: std.mem.Allocator, i: *usize, data: anytype
         return writeCursor(buffer, alloc, i, data);
     }
 
-    std.mem.copy(u8, buffer.*[i.*..], &@bitCast([len]u8, data));
+    std.mem.copy(u8, buffer.*[i.*..], &@as([len]u8, @bitCast(data)));
     i.* += len;
 }
 
 fn hash(qix: Qixel(RGB)) u6 {
     // a pixel of all 255s will add up to 6630, so u16s can handle the math
-    return @truncate(u6, @as(u16, qix.colors.red) * 3 + @as(u16, qix.colors.green) * 5 + @as(u16, qix.colors.blue) * 7 + @as(u16, qix.alpha) * 11);
+    return @truncate(@as(u16, qix.colors.red) * 3 + @as(u16, qix.colors.green) * 5 + @as(u16, qix.colors.blue) * 7 + @as(u16, qix.alpha) * 11);
 }
 
 pub fn encode(buffer: []Qixel(RGB), alloc: std.mem.Allocator, width: u32, height: u32, channels: Channels, colorspace: Colorspace) ![]u8 {
@@ -326,14 +326,14 @@ pub fn encode(buffer: []Qixel(RGB), alloc: std.mem.Allocator, width: u32, height
                         {
                             // Diff
                             // std.debug.print("diff\n", .{});
-                            try writeCursor(&result, alloc, &i, Diff.init(@truncate(i2, dr), @truncate(i2, dg), @truncate(i2, db)));
+                            try writeCursor(&result, alloc, &i, Diff.init(@as(i2, @truncate(dr)), @as(i2, @truncate(dg)), @as(i2, @truncate(db))));
                         } else if (dg_r > -9 and dg_r < 8 and
                             dg > -33 and dg < 32 and
                             dg_b > -9 and dg_b < 8)
                         {
                             // Luma
                             // std.debug.print("luma {} {} {}\n", .{ dg_r, dg, dg_b });
-                            try writeCursor(&result, alloc, &i, Luma.init(@truncate(i4, dg_r), @truncate(i6, dg), @truncate(i4, dg_b)));
+                            try writeCursor(&result, alloc, &i, Luma.init(@as(i4, @truncate(dg_r)), @as(i6, @truncate(dg)), @as(i4, @truncate(dg_b))));
                         } else {
                             // RGB
                             // std.debug.print("rgb\n", .{});
@@ -361,45 +361,45 @@ test "Header properly constructed rbg/alphal" {
     var h = Chunks.Header.init(2, 4, Channels.rgb, Colorspace.alpha_linear);
     var bytes: [14]u8 = .{ 'q', 'o', 'i', 'f', 0, 0, 0, 2, 0, 0, 0, 4, 3, 0 };
 
-    try std.testing.expectEqualSlices(u8, &bytes, &@bitCast([14]u8, h));
+    try std.testing.expectEqualSlices(u8, &bytes, &@as([14]u8, @bitCast(h)));
 }
 
 test "Header properly constructed rbg/all" {
     var h = Chunks.Header.init(2, 4, Channels.rgb, Colorspace.all_linear);
     var bytes: [14]u8 = .{ 'q', 'o', 'i', 'f', 0, 0, 0, 2, 0, 0, 0, 4, 3, 1 };
 
-    try std.testing.expectEqualSlices(u8, &bytes, &@bitCast([14]u8, h));
+    try std.testing.expectEqualSlices(u8, &bytes, &@as([14]u8, @bitCast(h)));
 }
 
 test "Header properly constructed rbga/alphal" {
     var h = Chunks.Header.init(2, 4, Channels.rgba, Colorspace.alpha_linear);
     var bytes: [14]u8 = .{ 'q', 'o', 'i', 'f', 0, 0, 0, 2, 0, 0, 0, 4, 4, 0 };
 
-    try std.testing.expectEqualSlices(u8, &bytes, &@bitCast([14]u8, h));
+    try std.testing.expectEqualSlices(u8, &bytes, &@as([14]u8, @bitCast(h)));
 }
 
 test "Header properly constructed rbga/all" {
     var h = Chunks.Header.init(2, 4, Channels.rgba, Colorspace.all_linear);
     var bytes: [14]u8 = .{ 'q', 'o', 'i', 'f', 0, 0, 0, 2, 0, 0, 0, 4, 4, 1 };
 
-    try std.testing.expectEqualSlices(u8, &bytes, &@bitCast([14]u8, h));
+    try std.testing.expectEqualSlices(u8, &bytes, &@as([14]u8, @bitCast(h)));
 }
 
 test "Run properly constructed" {
     var r = Chunks.Run.init(1);
-    try std.testing.expectEqual(@as(u8, 0b11000000), @bitCast(u8, r));
+    try std.testing.expectEqual(@as(u8, 0b11000000), @as(u8, @bitCast(r)));
     var r2 = Chunks.Run.init(16);
-    try std.testing.expectEqual(@as(u8, 0b11001111), @bitCast(u8, r2));
+    try std.testing.expectEqual(@as(u8, 0b11001111), @as(u8, @bitCast(r2)));
 }
 
 test "Index properly constructed" {
     var i = Chunks.Index.init(1);
-    try std.testing.expectEqual(@as(u8, 0b00000001), @bitCast(u8, i));
+    try std.testing.expectEqual(@as(u8, 0b00000001), @as(u8, @bitCast(i)));
 }
 
 test "Luma properly constructed" {
     var l = Chunks.Luma.init(-4, 8, -6);
-    try std.testing.expectEqualSlices(u8, &.{ 0b10_101000, 0b0100_0010 }, &@bitCast([2]u8, l));
+    try std.testing.expectEqualSlices(u8, &.{ 0b10_101000, 0b0100_0010 }, &@as([2]u8, @bitCast(l)));
 }
 
 test "sizeOnDisk returns expected values for qoi data structures" {
@@ -441,6 +441,6 @@ test "Encode begins with a header and ends with a tailer" {
 
     var expected_header = Chunks.Header.init(128, 128, Channels.rgb, Colorspace.alpha_linear);
 
-    try std.testing.expectEqualSlices(u8, &@bitCast([14]u8, expected_header), encoded[0..14]);
-    try std.testing.expectEqualSlices(u8, &@bitCast([8]u8, Chunks.Tailer{}), encoded[encoded.len - 8 .. encoded.len]);
+    try std.testing.expectEqualSlices(u8, &@as([14]u8, @bitCast(expected_header)), encoded[0..14]);
+    try std.testing.expectEqualSlices(u8, &@as([8]u8, @bitCast(Chunks.Tailer{})), encoded[encoded.len - 8 .. encoded.len]);
 }
